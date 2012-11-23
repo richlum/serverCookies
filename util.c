@@ -211,3 +211,61 @@ char *decode(const char *original, char *decoded) {
     *decoded = '\0';
     return d;
 }
+
+
+int  uri_has_args(char* request){
+	char *s = strchr(request, '?');
+	if (s==NULL){
+		return 0;
+	}
+	return 1;
+}
+
+//scan input for arguments  with format "?name=value&name2=value2\r\n"
+char*  uri_argnamevalue(char* request,char* argname,int namelen, char* argvalue, int valuelength){
+	char *s = strchr(request,'?');
+	if (s==NULL){
+		s = strchr(request, '&');
+	}
+	s++;
+	char *e = strchr(request,'=');
+	memset(argname,'\0',namelen);
+	memset(argvalue,'\0',namelen);
+	int i=0;
+	while(s[i]!='='){
+		argname[i]=s[i];
+		i++;
+	}
+	s=e+1;
+	i=0;
+	while((s[i]!='\r')&&(s[i]!='&')&&(s[i]!=' ')){
+		argvalue[i]=s[i];
+		i++;
+	}
+	if (s[i]=='&'){
+		s=s+i;
+		return s;
+	}
+	return NULL;
+
+}
+
+
+char* uri_argvalue(char* request, char* name, char* value, int valuelen){
+	char* s;
+	char* c;
+	if ((c=strstr(request,name))!=NULL){
+		s = strchr(c, '=');
+		s++;
+	}
+	memset(value,'\0', valuelen);
+	int i;
+	while((*s!='&')&&(*s!='\r')&&(*s!=' ')){
+		value[i++]=(int)s++;
+	}
+	return value;
+
+}
+
+
+

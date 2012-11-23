@@ -20,5 +20,7 @@ char *http_parse_header_field(char *request, int length, const char *header_fiel
 const char *http_parse_body(const char *request, int length);
 char *encode(const char *original, char *encoded);
 char *decode(const char *original, char *decoded);
+int  uri_has_args(char* request);
+char* uri_argnamevalue(char* request,char* name, int namelen, char*value, int valuelen	);
 
 #endif
