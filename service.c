@@ -20,7 +20,41 @@
 
 #define bufsize 5
 
+//release allocated resources for this connection
+void release_connection_resources(char* msgbuf){
+	if (msgbuf)
+		free(msgbuf);
+	msgbuf=NULL;
 
+}
+//search for content-length header field and return value
+int getContentLength(char* msgbuf,int length){
+//	char* c_len =  http_parse_header_field(msgbuf, length, "Content-Length");
+//	if (c_len)
+//		return atoi(c_len);
+//	return 0;
+	char* p = strstr(msgbuf,"Content-Length");
+	if (p){
+		p=p+strlen("Content-Length");
+		while (*p==' '||*p==':')
+			p++;
+		return atoi(p);
+	}
+	return 0;
+
+}
+//calculate the size of the header based upon finding
+// the crlf pair.  Includes the crlf pair as part of size
+// if no crlf pair found, return 0;
+int getSizeofHeader(char* msgbuf){
+
+	char* p = strstr(msgbuf, MESSAGE_TERMINATOR);
+	DBGMSG ("result of strstr = %x\n", (unsigned int) p);
+	if(p){
+		return (int)(p-msgbuf+4);
+	}
+	return 0;
+}
 
 void handle_client(int socket) {
     
@@ -33,7 +67,7 @@ void handle_client(int socket) {
 	char* msgbuf;
 	//request body if any
 	const char *abody;
-	const char* body;
+	//const char* body;
 	//recv parameter
 	int flag=0;
 	//request method
@@ -43,7 +77,7 @@ void handle_client(int socket) {
 
 	char* value;
 	//int len;
-	int contentlength;
+	int content_length;
 
 
 	// if true will loop waiting for more data
@@ -58,10 +92,19 @@ void handle_client(int socket) {
 
 
 	int bytesin = recv(socket, msgbuf, sizeof(msgbuf), flag);
+	if (bytesin==0){
+		fprintf(stderr, "remote closed connection, child closing\n");
+		release_connection_resources(msgbuf);
+		return;
+	}
+	if (bytesin<0)
+		perror("recv error:");
 	int msgsize = bytesin;
 	fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
+	int sizeleft=0;
 	while((!message_has_newlines(msgbuf))&&(bytesin>0)){
-		int sizeleft = *msgbufsize - msgsize-1;
+		TRACE
+		sizeleft = *msgbufsize - msgsize-1;
 		fprintf(stderr, "sizeleft = %d\n", sizeleft);
 		while (sizeleft<bytesin){
 			msgbuf=doubleBufferSize(msgbuf, msgbufsize);
@@ -69,18 +112,58 @@ void handle_client(int socket) {
 		}
 		char* appendbuf = msgbuf + msgsize;
 		bytesin = recv(socket, appendbuf, sizeleft, flag);
+		if (bytesin==0){
+			fprintf(stderr, "remote closed connection, child closing\n");
+			release_connection_resources(msgbuf);
+			return;
+		}
+		if (bytesin<0)
+			perror("recv error while fetching rest of headers:");
 		msgsize+=bytesin;
 		fprintf(stderr, "$%2d:%2d:%s\n",msgsize, bytesin, msgbuf);
 		fprintf(stderr, "strlen msgbug = %d\n", strlen(msgbuf)	);
 	}
-
+	TRACE
 	//now have complete first part of message since we have blank line ie \r\n\r\n
-
-	if (bytesin==0){
-		fprintf(stderr, "remote closed connection, child closing\n");
-		return;
-	}
 	fprintf(stderr, "received:$%s$\n",msgbuf);
+
+	content_length = getContentLength(msgbuf,msgsize);
+	if (content_length>0){
+		DBGMSG("content length = %d\n",content_length);
+		int read = msgsize - getSizeofHeader(msgbuf);
+		if (sizeleft<content_length-read){
+			// incr size should be min of contentlength-read-sizeleft
+			msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, content_length);
+			sizeleft= *msgbufsize - msgsize -1;
+		}
+		TRACE
+		DBGMSG("read = %d\n",read);
+		DBGMSG("msgsize = %d\n",msgsize);
+		//int sizeofheader = getSizeofHeader(msgbuf);
+		int sizeofheader = http_header_complete(msgbuf, msgsize);
+		DBGMSG("sizeofHeader = %d\n", sizeofheader);
+		while(read<content_length){
+			//get the missing body parts
+			DBGMSG("missing %d bytes from body",content_length-read);
+			char* appendbuf = msgbuf + msgsize;
+			bytesin = recv(socket, appendbuf, sizeleft, flag);
+			if (bytesin==0){
+				fprintf(stderr, "remote closed connection, child closing\n");
+				release_connection_resources(msgbuf);
+				return;
+			}
+			if (bytesin<0)
+				perror("recv error:");
+			read+=bytesin;
+			msgsize+=bytesin;
+
+		}
+	}
+
+	//now we have complete header and body (if any)
+
+
+	TRACE
 	connection_value=http_parse_header_field(msgbuf, MAXHDRSEARCHBYTES,header_connect );
 	fprintf(stderr, "connection: %s\n", connection_value);
 	if ((is_httpVer_1_0(msgbuf))||
@@ -94,7 +177,7 @@ void handle_client(int socket) {
 		persist_connection=1;
 
 	}
-
+	TRACE
 	while (bytesin>0){
 		TRACE
 		method = http_parse_method(msgbuf);
@@ -115,9 +198,9 @@ void handle_client(int socket) {
 			path = http_parse_path(msgbuf);
 			fprintf(stderr, "path=%s\n", path );
 			value = http_parse_header_field(msgbuf,sizeof(msgbuf),(const char*)"Content-length");
-			contentlength=atoi(value);
-			// is this count include /r/n - exclude headers?
-			body = http_parse_body(msgbuf,contentlength);
+//			contentlength=atoi(value);
+//			// is this count include /r/n - exclude headers?
+//			body = http_parse_body(msgbuf,contentlength);
 
 			abody = http_parse_body(msgbuf,bufsize);
 			if (abody == NULL){
@@ -146,10 +229,16 @@ void handle_client(int socket) {
 
 		if (!persist_connection){
 			TRACE
+			release_connection_resources(msgbuf);
 			break;
 		}
 		memset(msgbuf,'\0',sizeof(msgbuf));
 		bytesin = recv(socket, &msgbuf, bufsize, flag);
+		if (bytesin==0){
+			fprintf(stderr, "remote closed connection, child closing\n");
+			release_connection_resources(msgbuf);
+			return;
+		}
 	}
 	TRACE
     return;

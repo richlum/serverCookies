@@ -287,15 +287,31 @@ int is_httpVer_1_0(char* buf){
 // allocate double size buffer, copy old to new,
 // free old, repoint buffer to new
 // update msgsize to reflect new
-char* doubleBufferSize(char* buffer, unsigned int* msgsize){
-	fprintf(stderr,"strlen(buffer)= %d, msgsize = %d\n", strlen(buffer), *msgsize);
-	char* newbuffer = (char*)malloc(2*(*msgsize));
-	memset (newbuffer,'\0', 2*(*msgsize));
-	strncpy(newbuffer, buffer, *msgsize);
+char* doubleBufferSize(char* buffer, unsigned int* msgbufsize){
+	fprintf(stderr,"strlen(buffer)= %d, msgbufsize = %d\n", strlen(buffer), *msgbufsize);
+	char* newbuffer = (char*)malloc(2*(*msgbufsize));
+	memset (newbuffer,'\0', 2*(*msgbufsize));
+	strncpy(newbuffer, buffer, *msgbufsize);
 	free(buffer);
 	buffer=newbuffer;
-	*msgsize=2*(*msgsize);
-	DBGMSG("size of new buffer = %d\n",*msgsize);
+	newbuffer=NULL;
+	*msgbufsize=2*(*msgbufsize);
+	DBGMSG("size of new buffer = %d\n",*msgbufsize);
 	DBGMSG("$:%s\n",buffer);
+	return buffer;
+}
+// allocate new size buffer, copy old to new,
+// free old, repoint buffer to new
+// update msgsize to reflect new
+char* increaseBufferSizeBy(char* buffer, unsigned int* bufsize, unsigned int increase){
+	int newsize = *bufsize+increase+1;
+	char* newbuffer = (char*)malloc(newsize);
+	memset (newbuffer,'\0',newsize);
+	strncpy(newbuffer, buffer, *bufsize);
+	free(buffer);
+	buffer=newbuffer;
+	*bufsize=newsize;
+	newbuffer=NULL;
+	DBGMSG("size of new buffer = %d\n", newsize);
 	return buffer;
 }

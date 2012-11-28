@@ -44,5 +44,6 @@ char* uri_argnamevalue(char* request,char* name, int namelen, char*value, int va
 int message_has_newlines(char* buf);
 int is_httpVer_1_0(char* buf);
 char* doubleBufferSize(char* buffer, unsigned int* msgsize);
+char* increaseBufferSizeBy(char* buffer, unsigned int* bufsize, unsigned int increase);
 
 #endif
