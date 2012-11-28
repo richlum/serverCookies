@@ -5,6 +5,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
 
 #include "util.h"
 
@@ -280,4 +282,20 @@ int is_httpVer_1_0(char* buf){
 	DBGMSG("ishttpver = %d\n", (int)strstr(buf,HTTPV10STRING) >0 )
 	return  ((int)strstr(buf,HTTPV10STRING) >0) ;
 
+}
+
+// allocate double size buffer, copy old to new,
+// free old, repoint buffer to new
+// update msgsize to reflect new
+char* doubleBufferSize(char* buffer, unsigned int* msgsize){
+	fprintf(stderr,"strlen(buffer)= %d, msgsize = %d\n", strlen(buffer), *msgsize);
+	char* newbuffer = (char*)malloc(2*(*msgsize));
+	memset (newbuffer,'\0', 2*(*msgsize));
+	strncpy(newbuffer, buffer, *msgsize);
+	free(buffer);
+	buffer=newbuffer;
+	*msgsize=2*(*msgsize);
+	DBGMSG("size of new buffer = %d\n",*msgsize);
+	DBGMSG("$:%s\n",buffer);
+	return buffer;
 }

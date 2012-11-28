@@ -18,7 +18,9 @@
 #include "service.h"
 #include "util.h"
 
-#define bufsize 8192
+#define bufsize 5
+
+
 
 void handle_client(int socket) {
     
@@ -26,38 +28,62 @@ void handle_client(int socket) {
      *      until one of the conditions to close the connection is
      *      met.
      */
-	char buf[bufsize];
+	TRACE
+	//request message - accumulates unitl \r\n\r\n
+	char* msgbuf;
+	//request body if any
 	const char *abody;
+	const char* body;
+	//recv parameter
 	int flag=0;
+	//request method
 	http_method method;
+	//request path
 	const char* path;
+
 	char* value;
 	//int len;
 	int contentlength;
-	const char* body;
+
 
 	// if true will loop waiting for more data
 	int persist_connection=1;
 	// connectionheader value recived
 	char* connection_value;
 
-	buf
+	unsigned int mbufsize = bufsize;
+	unsigned int *msgbufsize= &mbufsize;
+	msgbuf=(char*) malloc(*msgbufsize);
+	memset(msgbuf,'\0',sizeof(msgbuf));
 
 
-	memset(buf,'\0',sizeof(buf));
+	int bytesin = recv(socket, msgbuf, sizeof(msgbuf), flag);
+	int msgsize = bytesin;
+	fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
+	while((!message_has_newlines(msgbuf))&&(bytesin>0)){
+		int sizeleft = *msgbufsize - msgsize-1;
+		fprintf(stderr, "sizeleft = %d\n", sizeleft);
+		while (sizeleft<bytesin){
+			msgbuf=doubleBufferSize(msgbuf, msgbufsize);
+			sizeleft= *msgbufsize - msgsize - 1;
+		}
+		char* appendbuf = msgbuf + msgsize;
+		bytesin = recv(socket, appendbuf, sizeleft, flag);
+		msgsize+=bytesin;
+		fprintf(stderr, "$%2d:%2d:%s\n",msgsize, bytesin, msgbuf);
+		fprintf(stderr, "strlen msgbug = %d\n", strlen(msgbuf)	);
+	}
 
-	int bytesin = recv(socket, &buf, bufsize, flag);
-
-
+	//now have complete first part of message since we have blank line ie \r\n\r\n
 
 	if (bytesin==0){
 		fprintf(stderr, "remote closed connection, child closing\n");
 		return;
 	}
-	fprintf(stderr, "received:$%s$\n",buf);
-	connection_value=http_parse_header_field(buf, MAXHDRSEARCHBYTES,header_connect );
+	fprintf(stderr, "received:$%s$\n",msgbuf);
+	connection_value=http_parse_header_field(msgbuf, MAXHDRSEARCHBYTES,header_connect );
 	fprintf(stderr, "connection: %s\n", connection_value);
-	if ((is_httpVer_1_0(buf))||
+	if ((is_httpVer_1_0(msgbuf))||
 			(strncasecmp(connection_value,"close", 10)==0)){
 		//either http/1.0 or request for not persistent
 		fprintf(stderr,"Will NOT persist connection\n");
@@ -71,30 +97,13 @@ void handle_client(int socket) {
 
 	while (bytesin>0){
 		TRACE
-		method = http_parse_method(buf);
+		method = http_parse_method(msgbuf);
 		fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
 
 		switch (method){
 
 		case METHOD_GET:
-			buf[bytesin+1]='\0';
-			int morebytes=0;
-			while (!message_has_newlines(buf)&&morebytes){
-				int nextbyte = bytesin;
-				morebytes = recv(socket,&buf[bytesin], bufsize-bytesin,flag);
-				nextbyte=bytesin+morebytes;
-				fprintf(stderr,"incomplete get message, recv more bytes, in=%d, new=%d, out=%d\n",
-						bytesin, morebytes, nextbyte);
-				int i=0;
-				for (i=0;i<nextbyte;i++){
-						printf("\t%d  %c  %x\n", i, buf[i], buf[i]);
-				}
-
-				buf[nextbyte+1]='\0';
-				fprintf(stderr,"msg: %s", buf);
-			}
-
-			path = http_parse_path(http_parse_uri(buf));
+			path = http_parse_path(http_parse_uri(msgbuf));
 			fprintf(stderr, "path=%s\n", path );
 
 			//extract attributes?
@@ -103,14 +112,14 @@ void handle_client(int socket) {
 		case METHOD_POST:
 			//handle partial request
 
-			path = http_parse_path(buf);
+			path = http_parse_path(msgbuf);
 			fprintf(stderr, "path=%s\n", path );
-			value = http_parse_header_field(buf,sizeof(buf),(const char*)"Content-length");
+			value = http_parse_header_field(msgbuf,sizeof(msgbuf),(const char*)"Content-length");
 			contentlength=atoi(value);
 			// is this count include /r/n - exclude headers?
-			body = http_parse_body(buf,contentlength);
+			body = http_parse_body(msgbuf,contentlength);
 
-			abody = http_parse_body(buf,bufsize);
+			abody = http_parse_body(msgbuf,bufsize);
 			if (abody == NULL){
 				fprintf(stderr,"nobody %d \n", sizeof(abody));
 			}else{
@@ -139,8 +148,8 @@ void handle_client(int socket) {
 			TRACE
 			break;
 		}
-		memset(buf,'\0',sizeof(buf));
-		bytesin = recv(socket, &buf, bufsize, flag);
+		memset(msgbuf,'\0',sizeof(msgbuf));
+		bytesin = recv(socket, &msgbuf, bufsize, flag);
 	}
 	TRACE
     return;
