@@ -5,17 +5,11 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
-#include <assert.h>
-#include <stdlib.h>
 
 #include "util.h"
 
-
-
 const char *http_method_str[] = {"GET", "POST", "HEAD", "OPTIONS", "PUT",
     "DELETE", "TRACE", "CONNECT"};
-
-const char* header_connect="Connection";
 
 /*
  * If the HTTP header found in the first 'length' bytes of 'request'
@@ -101,6 +95,7 @@ const char *http_parse_path(const char *uri) {
  * call.
  */
 char *http_parse_header_field(char *request, int length, const char *header_field) {
+    
     char *oldlf, *newlf, *newnull, *start;
     int len = strlen(header_field);
     
@@ -145,7 +140,7 @@ char *http_parse_header_field(char *request, int length, const char *header_fiel
  * called after calls to other parse functions.
  */
 const char *http_parse_body(const char *request, int length) {
-    TRACE
+    
     const char *oldlf, *newlf, *newnull;
     
     // Ignore spaces in the beginning of the request
@@ -215,118 +210,4 @@ char *decode(const char *original, char *decoded) {
     }
     *decoded = '\0';
     return d;
-}
-
-
-int  uri_has_args(char* request){
-	char *s = strchr(request, '?');
-	if (s==NULL){
-		return 0;
-	}
-	return 1;
-}
-
-//scan input for arguments  with format "?name=value&name2=value2\r\n"
-char*  uri_argnamevalue(char* request,char* argname,int namelen, char* argvalue, int valuelength){
-	char *s = strchr(request,'?');
-	if (s==NULL){
-		s = strchr(request, '&');
-	}
-	s++;
-	char *e = strchr(request,'=');
-	memset(argname,'\0',namelen);
-	memset(argvalue,'\0',namelen);
-	int i=0;
-	while(s[i]!='='){
-		argname[i]=s[i];
-		i++;
-	}
-	s=e+1;
-	i=0;
-	while((s[i]!='\r')&&(s[i]!='&')&&(s[i]!=' ')){
-		argvalue[i]=s[i];
-		i++;
-	}
-	if (s[i]=='&'){
-		s=s+i;
-		return s;
-	}
-	return NULL;
-
-}
-
-
-char* uri_argvalue(char* request, char* name, char* value, int valuelen){
-	char* s;
-	char* c;
-	if ((c=strstr(request,name))!=NULL){
-		s = strchr(c, '=');
-		s++;
-	}
-	memset(value,'\0', valuelen);
-	int i;
-	while((*s!='&')&&(*s!='\r')&&(*s!=' ')){
-		value[i++]=*s;
-		s++;
-	}
-	return value;
-
-}
-
-
-int message_has_newlines(char* buf){
-	char* p = strstr(buf, MESSAGE_TERMINATOR);
-	unsigned int size=0;
-	if (p){
-		size = p-buf;
-		printf("newlines found, msgsize=%d\n",size);
-	}else{
-		printf("newlines not found, size so far = %zu\n", 
-			strlen(buf));
-	}
-
-	return (size > 0);
-}
-
-int is_httpVer_1_0(char* buf){
-	char* p = strstr(buf,HTTPV10STRING);
-	if (p){
-		unsigned int size = p-buf;
-		DBGMSG("ishttpver, size = %d\n", size )
-		return (size>0);
-	}
-	return 0;
-}
-
-// allocate double size buffer, copy old to new,
-// free old, repoint buffer to new
-// update msgsize to reflect new
-char* doubleBufferSize(char* buffer, unsigned int* msgbufsize){
-	fprintf(stderr,"strlen(buffer)= %zu, msgbufsize = %d\n", 
-		strlen(buffer), *msgbufsize);
-	char* newbuffer = (char*)malloc(2*(*msgbufsize));
-	memset (newbuffer,'\0', 2*(*msgbufsize));
-	strncpy(newbuffer, buffer, *msgbufsize);
-	free(buffer);
-	buffer=newbuffer;
-	newbuffer=NULL;
-	*msgbufsize=2*(*msgbufsize);
-	DBGMSG("size of new buffer = %d\n",*msgbufsize);
-	DBGMSG("$:%s\n",buffer);
-	return buffer;
-}
-// allocate new size buffer, copy old to new,
-// free old, repoint buffer to new
-// update msgsize to reflect new
-char* increaseBufferSizeBy(char* buffer, unsigned int* bufsize, unsigned int increase){
-	int newsize = *bufsize+increase+1;
-	char* newbuffer = (char*)malloc(newsize);
-	memset (newbuffer,'\0',newsize);
-	strncpy(newbuffer, buffer, *bufsize);
-	free(buffer);
-	buffer=newbuffer;
-	*bufsize=newsize;
-	newbuffer=NULL;
-	DBGMSG("size of new buffer = %d\n", newsize);
-	return buffer;
 }

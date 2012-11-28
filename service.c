@@ -20,6 +20,18 @@
 
 #define bufsize 5
 
+
+void hexprint(char* buf, int len){
+
+	int i ;
+	for (i=0;i<len;i++){
+		printf("\t%2d %x %c\n", i, buf[i], buf[i]);
+	}
+
+
+
+}
+
 //release allocated resources for this connection
 void release_connection_resources(char* msgbuf){
 	if (msgbuf)
@@ -49,12 +61,13 @@ int getContentLength(char* msgbuf,int length){
 int getSizeofHeader(char* msgbuf){
 
 	char* p = strstr(msgbuf, MESSAGE_TERMINATOR);
-	DBGMSG ("result of strstr = %x\n", (unsigned int) p);
+	DBGMSG ("result of strstr = %lx\n", (unsigned long) p);
 	if(p){
 		return (int)(p-msgbuf+4);
 	}
 	return 0;
 }
+
 
 void handle_client(int socket) {
     
@@ -75,7 +88,7 @@ void handle_client(int socket) {
 	//request path
 	const char* path;
 
-	char* value;
+//	char* value;
 	//int len;
 	int content_length;
 
@@ -89,9 +102,10 @@ void handle_client(int socket) {
 	unsigned int *msgbufsize= &mbufsize;
 	msgbuf=(char*) malloc(*msgbufsize);
 	memset(msgbuf,'\0',sizeof(msgbuf));
+	TRACE	
+	DBGMSG("sizeof msgbuf = %d\n", *msgbufsize);
 
-
-	int bytesin = recv(socket, msgbuf, sizeof(msgbuf), flag);
+	int bytesin = recv(socket, msgbuf, *msgbufsize, flag);
 	if (bytesin==0){
 		fprintf(stderr, "remote closed connection, child closing\n");
 		release_connection_resources(msgbuf);
@@ -106,6 +120,7 @@ void handle_client(int socket) {
 		TRACE
 		sizeleft = *msgbufsize - msgsize-1;
 		fprintf(stderr, "sizeleft = %d\n", sizeleft);
+		hexprint(msgbuf, msgsize+2);
 		while (sizeleft<bytesin){
 			msgbuf=doubleBufferSize(msgbuf, msgbufsize);
 			sizeleft= *msgbufsize - msgsize - 1;
@@ -121,7 +136,7 @@ void handle_client(int socket) {
 			perror("recv error while fetching rest of headers:");
 		msgsize+=bytesin;
 		fprintf(stderr, "$%2d:%2d:%s\n",msgsize, bytesin, msgbuf);
-		fprintf(stderr, "strlen msgbug = %d\n", strlen(msgbuf)	);
+		fprintf(stderr, "strlen msgbug = %d\n", (int)strlen(msgbuf)	);
 	}
 
 	TRACE
@@ -201,14 +216,14 @@ void handle_client(int socket) {
 
 			path = http_parse_path(msgbuf);
 			fprintf(stderr, "path=%s\n", path );
-			value = http_parse_header_field(msgbuf,sizeof(msgbuf),(const char*)"Content-length");
+			//char* value = http_parse_header_field(msgbuf,sizeof(msgbuf),(const char*)"Content-length");
 //			contentlength=atoi(value);
 //			// is this count include /r/n - exclude headers?
 //			body = http_parse_body(msgbuf,contentlength);
 
 			abody = http_parse_body(msgbuf,bufsize);
 			if (abody == NULL){
-				fprintf(stderr,"nobody %d \n", sizeof(abody));
+				fprintf(stderr,"nobody %d \n", (int)sizeof(abody));
 			}else{
 				fprintf(stderr, "body = %s\n\n",abody);
 			}
