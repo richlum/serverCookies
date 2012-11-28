@@ -29,18 +29,18 @@ void release_connection_resources(char* msgbuf){
 }
 //search for content-length header field and return value
 int getContentLength(char* msgbuf,int length){
-//	char* c_len =  http_parse_header_field(msgbuf, length, "Content-Length");
-//	if (c_len)
-//		return atoi(c_len);
-//	return 0;
-	char* p = strstr(msgbuf,"Content-Length");
-	if (p){
-		p=p+strlen("Content-Length");
-		while (*p==' '||*p==':')
-			p++;
-		return atoi(p);
-	}
+	char* c_len =  http_parse_header_field(msgbuf, length, "Content-Length");
+	if (c_len)
+		return atoi(c_len);
 	return 0;
+//	char* p = strstr(msgbuf,"Content-Length");
+//	if (p){
+//		p=p+strlen("Content-Length");
+//		while (*p==' '||*p==':')
+//			p++;
+//		return atoi(p);
+//	}
+//	return 0;
 
 }
 //calculate the size of the header based upon finding
@@ -123,14 +123,20 @@ void handle_client(int socket) {
 		fprintf(stderr, "$%2d:%2d:%s\n",msgsize, bytesin, msgbuf);
 		fprintf(stderr, "strlen msgbug = %d\n", strlen(msgbuf)	);
 	}
+
 	TRACE
 	//now have complete first part of message since we have blank line ie \r\n\r\n
 	fprintf(stderr, "received:$%s$\n",msgbuf);
+	int sizeofheader = getSizeofHeader(msgbuf);
+	DBGMSG("sizeofHeader = %d\n", sizeofheader);
+	//int sizeofheader = getSizeofHeader(msgbuf);
+	sizeofheader = http_header_complete(msgbuf, msgsize);
+	DBGMSG("sizeofHeader = %d\n", sizeofheader);
 
 	content_length = getContentLength(msgbuf,msgsize);
 	if (content_length>0){
 		DBGMSG("content length = %d\n",content_length);
-		int read = msgsize - getSizeofHeader(msgbuf);
+		int read = msgsize - sizeofheader;
 		if (sizeleft<content_length-read){
 			// incr size should be min of contentlength-read-sizeleft
 			msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, content_length);
@@ -139,9 +145,7 @@ void handle_client(int socket) {
 		TRACE
 		DBGMSG("read = %d\n",read);
 		DBGMSG("msgsize = %d\n",msgsize);
-		//int sizeofheader = getSizeofHeader(msgbuf);
-		int sizeofheader = http_header_complete(msgbuf, msgsize);
-		DBGMSG("sizeofHeader = %d\n", sizeofheader);
+
 		while(read<content_length){
 			//get the missing body parts
 			DBGMSG("missing %d bytes from body",content_length-read);
