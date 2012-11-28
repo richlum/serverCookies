@@ -8,8 +8,12 @@
 
 #include "util.h"
 
+
+
 const char *http_method_str[] = {"GET", "POST", "HEAD", "OPTIONS", "PUT",
     "DELETE", "TRACE", "CONNECT"};
+
+const char* header_connect="Connection";
 
 /*
  * If the HTTP header found in the first 'length' bytes of 'request'
@@ -95,7 +99,6 @@ const char *http_parse_path(const char *uri) {
  * call.
  */
 char *http_parse_header_field(char *request, int length, const char *header_field) {
-    
     char *oldlf, *newlf, *newnull, *start;
     int len = strlen(header_field);
     
@@ -140,7 +143,7 @@ char *http_parse_header_field(char *request, int length, const char *header_fiel
  * called after calls to other parse functions.
  */
 const char *http_parse_body(const char *request, int length) {
-    
+    TRACE
     const char *oldlf, *newlf, *newnull;
     
     // Ignore spaces in the beginning of the request
@@ -268,4 +271,13 @@ char* uri_argvalue(char* request, char* name, char* value, int valuelen){
 }
 
 
+int message_has_newlines(char* buf){
 
+	return (int)strstr(buf, MESSAGE_TERMINATOR);
+}
+
+int is_httpVer_1_0(char* buf){
+	DBGMSG("ishttpver = %d\n", (int)strstr(buf,HTTPV10STRING) >0 )
+	return  ((int)strstr(buf,HTTPV10STRING) >0) ;
+
+}

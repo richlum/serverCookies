@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror -g -Wextra -Wno-unused-parameter
+CFLAGS=-Wall -Werror -g -Wextra -Wno-unused-parameter -DDEBUG
 LDFLAGS=
 
 all: cshttp
