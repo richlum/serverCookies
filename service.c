@@ -87,7 +87,7 @@ const char* httpver = "HTTP/1.1";
 const char* default_http_connection = "Connection: keep-alive";
 const char* default_http_contenttype = "Content-Type: text/plain";
 const char* default_http_cache_control = "Cache-Control: public";
-
+const char* lineend = "\r\n";
 
 void hexprint(const char* buf, int len){
 
@@ -106,6 +106,7 @@ void release_connection_resources(char* msgbuf){
 }
 //search for content-length header field and return value
 int getContentLength(char* msgbuf,int length){
+	TRACE
 	char* c_len =  http_parse_header_field(msgbuf, length, "Content-Length");
 	if (c_len)
 		return atoi(c_len);
@@ -160,20 +161,42 @@ char* addfield(char* to, const char* from, unsigned int* to_bufsize){
 		doubleBufferSize(to,to_bufsize);
 	}
 	strcat(to,from	);
-	strcat(to,"\r\n");
+	strcat(to,lineend);
 	return to;
 }
 
 // get the date for http respone field output
 char* get_default_http_date(char* str,int len){
+	char timestr[bufsize];
 	time_t timer = time(&timer);
 	char* fmt ="%a %b %d %H:%M:%S %Z %Y";
 	struct tm* currtime = gmtime(&timer);
-	strftime(str,len,fmt,currtime);
-	DBGMSG("timestamp = %s\n",str);
+	strftime(timestr,bufsize,fmt,currtime);
+	strcpy (str, "Date: ");
+	strcat (str, timestr);
+	DBGMSG("datefield = %s\n",str);
 	return str;
 }
 
+
+// get the date for http respone field output
+char* get_localtime(char* str,int len){
+	time_t timer = time(&timer);
+	char* fmt ="%a %b %d %H:%M:%S %Z %Y";
+	struct tm* currtime = localtime(&timer);
+	strftime(str,len,fmt,currtime);
+	DBGMSG("localtime = %s\n",str);
+	return str;
+}
+
+//given content length, make an http response header field
+char* get_http_content_length(int contlength,char* contlenstr){
+	strcpy( contlenstr, "Content-Length: ");
+	char sizestr[bufsize];
+	sprintf(sizestr,"%d",contlength);
+	strcat( contlenstr, sizestr);
+	return contlenstr;
+}
 
 void handle_client(int socket) {
     
@@ -366,7 +389,10 @@ void handle_client(int socket) {
 		TRACE
 		hexprint(path, strlen(path)+2);
 		int respindex;
+		int contlength=0;
 		int cmd = command_from_string(path);
+		char* body;
+
 		switch (cmd){
 		case CMDLOGIN:
 			break;
@@ -375,6 +401,11 @@ void handle_client(int socket) {
 		case CMDSERVERTIME:
 			TRACE
 			respindex=2;
+			body = (char*)malloc(bufsize);
+			memset(body,'\0',bufsize);
+			body = get_localtime(body,bufsize);
+			contlength=strlen(body);
+			DBGMSG("content length = %d\n",contlength);
 			break;
 		case CMDBROWSER:
 			break;
@@ -407,7 +438,22 @@ void handle_client(int socket) {
 			response = addfield(response, default_http_contenttype,&responsebuffersize);
 			response = addfield(response, default_http_cache_control,&responsebuffersize);
 			char timestr[bufsize];
-			response = addfield(response, get_default_http_date(timestr,bufsize),&responsebuffersize);
+			char* timefield = get_default_http_date(timestr,bufsize);
+			response = addfield(response, timefield,&responsebuffersize);
+
+			if (contlength!=0){
+				TRACE
+				char contlenstr[bufsize];
+				response = addfield(response, get_http_content_length(contlength,contlenstr),&responsebuffersize);
+			}
+
+			response = addfield(response, "" ,&responsebuffersize);
+
+			if (contlength!=0){
+				TRACE
+				response = addfield(response, body,&responsebuffersize);
+			}
+
 		}else{
 			//todo we always need some kind of response?
 		}
