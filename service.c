@@ -61,12 +61,16 @@ int getContentLength(char* msgbuf,int length){
 int getSizeofHeader(char* msgbuf){
 
 	char* p = strstr(msgbuf, MESSAGE_TERMINATOR);
-	DBGMSG ("result of strstr = %lx\n", (unsigned long) p);
+
 	if(p){
+		DBGMSG ("offset of start of crlf term = %d\n", (int) (p-msgbuf));
 		return (int)(p-msgbuf+4);
 	}
+	DBGMSG("Header not terminated yet :%d\n",__LINE__);
 	return 0;
 }
+
+
 
 
 void handle_client(int socket) {
@@ -101,11 +105,14 @@ void handle_client(int socket) {
 	unsigned int mbufsize = bufsize;
 	unsigned int *msgbufsize= &mbufsize;
 	msgbuf=(char*) malloc(*msgbufsize);
-	memset(msgbuf,'\0',sizeof(msgbuf));
+	int bytesin=0;
+	do{
+
+	memset(msgbuf,'\0', *msgbufsize);
 	TRACE	
 	DBGMSG("sizeof msgbuf = %d\n", *msgbufsize);
 
-	int bytesin = recv(socket, msgbuf, *msgbufsize, flag);
+	bytesin = recv(socket, msgbuf, *msgbufsize, flag);
 	if (bytesin==0){
 		fprintf(stderr, "remote closed connection, child closing\n");
 		release_connection_resources(msgbuf);
@@ -113,14 +120,18 @@ void handle_client(int socket) {
 	}
 	if (bytesin<0)
 		perror("recv error:");
+
+
 	int msgsize = bytesin;
 	fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
 	int sizeleft=0;
+
+/***** recv header until blank line ***********/
 	while((!message_has_newlines(msgbuf))&&(bytesin>0)){
 		TRACE
 		sizeleft = *msgbufsize - msgsize-1;
 		fprintf(stderr, "sizeleft = %d\n", sizeleft);
-		hexprint(msgbuf, msgsize+2);
+		//hexprint(msgbuf, msgsize+2);
 		while (sizeleft<bytesin){
 			msgbuf=doubleBufferSize(msgbuf, msgbufsize);
 			sizeleft= *msgbufsize - msgsize - 1;
@@ -139,7 +150,8 @@ void handle_client(int socket) {
 		fprintf(stderr, "strlen msgbug = %d\n", (int)strlen(msgbuf)	);
 	}
 
-	TRACE
+	hexprint(msgbuf, msgsize+2);
+	DBGMSG("complete message %d\n" , __LINE__);
 	//now have complete first part of message since we have blank line ie \r\n\r\n
 	fprintf(stderr, "received:$%s$\n",msgbuf);
 	int sizeofheader = getSizeofHeader(msgbuf);
@@ -148,6 +160,7 @@ void handle_client(int socket) {
 	sizeofheader = http_header_complete(msgbuf, msgsize);
 	DBGMSG("sizeofHeader = %d\n", sizeofheader);
 
+/****   get rest of body (if any) **************/
 	content_length = getContentLength(msgbuf,msgsize);
 	if (content_length>0){
 		DBGMSG("content length = %d\n",content_length);
@@ -181,84 +194,108 @@ void handle_client(int socket) {
 
 	//now we have complete header and body (if any)
 
-
+/***** parse command ********************/
 	TRACE
+
+	//connection
 	connection_value=http_parse_header_field(msgbuf, MAXHDRSEARCHBYTES,header_connect );
-	fprintf(stderr, "connection: %s\n", connection_value);
 	if ((is_httpVer_1_0(msgbuf))||
-			(strncasecmp(connection_value,"close", 10)==0)){
+			((connection_value)&&(strncasecmp(connection_value,"close", 10)==0))){
 		//either http/1.0 or request for not persistent
+		fprintf(stderr, "connection: %s\n", connection_value);
 		fprintf(stderr,"Will NOT persist connection\n");
 		//todo: should send "Connection: close"   (8.1.2.1)
 		persist_connection=0;
 	}else {
-		fprintf(stderr,"Connection: keep-alive, persisting connection\n");
+		fprintf(stderr,"persisting connection\n");
 		persist_connection=1;
 
 	}
 	TRACE
-	while (bytesin>0){
+
+	//method
+	method = http_parse_method(msgbuf);
+	fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
+
+	switch (method){
+
+	case METHOD_GET:
+		path = http_parse_path(http_parse_uri(msgbuf));
+		fprintf(stderr, "path=%s\n", path );
+
+		//extract attributes?
 		TRACE
-		method = http_parse_method(msgbuf);
-		fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
+		break;
+	case METHOD_POST:
+		//handle partial request
 
-		switch (method){
-
-		case METHOD_GET:
-			path = http_parse_path(http_parse_uri(msgbuf));
-			fprintf(stderr, "path=%s\n", path );
-
-			//extract attributes?
-
-			break;
-		case METHOD_POST:
-			//handle partial request
-
-			path = http_parse_path(msgbuf);
-			fprintf(stderr, "path=%s\n", path );
-			//char* value = http_parse_header_field(msgbuf,sizeof(msgbuf),(const char*)"Content-length");
+		path = http_parse_path(msgbuf);
+		fprintf(stderr, "path=%s\n", path );
+		//char* value = http_parse_header_field(msgbuf,*msgbufsize,(const char*)"Content-length");
 //			contentlength=atoi(value);
 //			// is this count include /r/n - exclude headers?
 //			body = http_parse_body(msgbuf,contentlength);
 
-			abody = http_parse_body(msgbuf,bufsize);
-			if (abody == NULL){
-				fprintf(stderr,"nobody %d \n", (int)sizeof(abody));
-			}else{
-				fprintf(stderr, "body = %s\n\n",abody);
-			}
-
-
-			break;
-
-		case METHOD_HEAD:
-		case METHOD_OPTIONS:
-		case METHOD_PUT:
-		case METHOD_DELETE:
-		case METHOD_TRACE:
-		case METHOD_CONNECT:
-			fprintf(stderr,"Unspported Method called %s \n", http_method_str[method]);
-			break;
-		case METHOD_UNKNOWN:
-			fprintf(stderr,"unknown method called %d \n", method);
-			break;
-		default:
-			break;
+		abody = http_parse_body(msgbuf,bufsize);
+		if (abody == NULL){
+			//todo fix this : sizeof will not work
+			fprintf(stderr,"nobody %d \n", (int)sizeof(abody));
+		}else{
+			fprintf(stderr, "body = %s\n\n",abody);
 		}
 
-		if (!persist_connection){
-			TRACE
-			release_connection_resources(msgbuf);
-			break;
-		}
-		memset(msgbuf,'\0',sizeof(msgbuf));
-		bytesin = recv(socket, &msgbuf, bufsize, flag);
-		if (bytesin==0){
-			fprintf(stderr, "remote closed connection, child closing\n");
-			release_connection_resources(msgbuf);
-			return;
-		}
+
+		break;
+
+	case METHOD_HEAD:
+	case METHOD_OPTIONS:
+	case METHOD_PUT:
+	case METHOD_DELETE:
+	case METHOD_TRACE:
+	case METHOD_CONNECT:
+		fprintf(stderr,"Unspported Method called %s \n", http_method_str[method]);
+		break;
+	case METHOD_UNKNOWN:
+		fprintf(stderr,"unknown method called %d \n", method);
+		break;
+	default:
+		break;
 	}
+
 	TRACE
-    return;
+	if (!persist_connection){
+		TRACE
+		release_connection_resources(msgbuf);
+		break;
+	}
+
+//	memset(msgbuf,'\0',*msgbufsize);
+//	bytesin = recv(socket, &msgbuf, bufsize, flag);
+//	if (bytesin==0){
+//		fprintf(stderr, "remote closed connection, child closing\n");
+//		release_connection_resources(msgbuf);
+//		return;
+//	}
+	TRACE
+/********** build response ******************************/
+
+/*********  send response *******************************/
+	} while( bytesin >0);
+
+/******** get next message *******************************/
+//	memset(msgbuf,'\0', *msgbufsize);
+//
+//	int bytesin = recv(socket, msgbuf, *msgbufsize, flag);
+//	if (bytesin==0){
+//		fprintf(stderr, "remote closed connection, child closing\n");
+//		release_connection_resources(msgbuf);
+//		return;
+//	}
+//	if (bytesin<0)
+//		perror("recv error:");
+//	int msgsize = bytesin;
+//	fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
+//	int sizeleft=0;
+
+
 }
