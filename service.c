@@ -14,14 +14,82 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <signal.h>
-
+#include <time.h>
 #include "service.h"
 #include "util.h"
 
-#define bufsize 5
+#define bufsize 256
+
+const char* responsestr[] ={
+		"100 Continue",
+		"101 Switching Protocols",
+		"200 OK",
+		"201 Created",
+		"202 Accepted",
+		"203 Non-Authoritative Information",
+		"204 No Content",
+		"205 Reset Content",
+		"206 Partial Content",
+		"300 Multiple Choices",
+		"301 Moved Permanently",
+		"302 Found",
+		"303 See Other",
+		"304 Not Modified",
+		"305 Use Proxy",
+		"307 Temporary Redirect",
+		"400 Bad Request",
+		"401 Unauthorized",
+		"402 Payment Required",
+		"403 Forbidden",
+		"404 Not Found",
+		"405 Method Not Allowed",
+		"406 Not Acceptable",
+		"407 Proxy Authentication Required",
+		"408 Request Timeout",
+		"409 Conflict",
+		"410 Gone",
+		"411 Length Required",
+		"412 Precondition Failed",
+		"413 Request Entity Too Large",
+		"414 Request-URI Too Long",
+		"415 Unsupported Media Type",
+		"416 Requested Range Not Satisfiable",
+		"417 Expectation Failed",
+		"500 Internal Server Error",
+		"501 Not Implemented",
+		"502 Bad Gateway",
+		"503 Service Unavailable",
+		"504 Gateway Timeout",
+		"505 HTTP Version Not Supported"
+};
+
+typedef enum {
+    CMDLOGIN, CMDLOGOUT,CMDSERVERTIME,CMDBROWSER,CMDREDIRECT,
+    CMDGETFILE,CMDPUTFILE,CMDADDCART,CMDDELCART,CMDCHECKOUT,
+    CMDCLOSE
+} servcmd;
+
+const char* server_commands[] = {
+		"login",
+		"logout",
+		"servertime",
+		"browser",
+		"redirect",
+		"getfile",
+		"putfile",
+		"addcart",
+		"delcart",
+		"checkout",
+		"close"
+};
+
+const char* httpver = "HTTP/1.1";
+const char* default_http_connection = "Connection: keep-alive";
+const char* default_http_contenttype = "Content-Type: text/plain";
+const char* default_http_cache_control = "Cache-Control: public";
 
 
-void hexprint(char* buf, int len){
+void hexprint(const char* buf, int len){
 
 	int i ;
 	for (i=0;i<len;i++){
@@ -60,6 +128,51 @@ int getSizeofHeader(char* msgbuf){
 }
 
 
+int command_from_string(const char* path){
+	int i;
+	//fist char should be a slash that can be ignored
+	//all commands must be relative to root
+	const char* p=path+1;
+	for (i=0; i< CMDCLOSE; i++){
+		if (!strncasecmp(p, server_commands[i], strlen(server_commands[i]))){
+			//matched
+			return i;
+		}
+	}
+	//not found
+	return -1;
+}
+
+
+char* addheader(char* to, int respidx){
+	strcat(to,httpver	);
+	strcat(to, " ");
+	strcat(to, responsestr[respidx]);
+	strcat(to,"\r\n");
+	return to;
+
+}
+// add given field into http response
+// allocate more size if required.
+//
+char* addfield(char* to, const char* from, unsigned int* to_bufsize){
+	while ((*to_bufsize-strlen(to))<=(strlen(from)+3)){
+		doubleBufferSize(to,to_bufsize);
+	}
+	strcat(to,from	);
+	strcat(to,"\r\n");
+	return to;
+}
+
+// get the date for http respone field output
+char* get_default_http_date(char* str,int len){
+	time_t timer = time(&timer);
+	char* fmt ="%a %b %d %H:%M:%S %Z %Y";
+	struct tm* currtime = gmtime(&timer);
+	strftime(str,len,fmt,currtime);
+	DBGMSG("timestamp = %s\n",str);
+	return str;
+}
 
 
 void handle_client(int socket) {
@@ -108,7 +221,6 @@ void handle_client(int socket) {
 		}
 		if (bytesin<0)
 			perror("recv error:");
-
 
 		int msgsize = bytesin;
 		fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
@@ -179,7 +291,6 @@ void handle_client(int socket) {
 
 			}
 		}
-
 		//now we have complete header and body (if any)
 
 	/***** parse command ********************/
@@ -251,17 +362,90 @@ void handle_client(int socket) {
 		}
 
 		TRACE
-		if (!persist_connection){
+	/********** build response ******************************/
+		TRACE
+		hexprint(path, strlen(path)+2);
+		int respindex;
+		int cmd = command_from_string(path);
+		switch (cmd){
+		case CMDLOGIN:
+			break;
+		case CMDLOGOUT:
+			break;
+		case CMDSERVERTIME:
 			TRACE
-			release_connection_resources(msgbuf);
+			respindex=2;
+			break;
+		case CMDBROWSER:
+			break;
+		case CMDREDIRECT:
+			break;
+		case CMDGETFILE:
+			break;
+		case CMDPUTFILE:
+			break;
+		case CMDADDCART:
+			break;
+		case CMDDELCART:
+			break;
+		case CMDCHECKOUT:
+			break;
+		case CMDCLOSE:
+			break;
+		case -1:
+		default:
 			break;
 		}
 
-		TRACE
-	/********** build response ******************************/
+		char* response;
+		if (respindex>0){
+			response = (char*)malloc(bufsize);
+			memset(response,'\0',bufsize);
+			unsigned int   responsebuffersize=bufsize;
+			response = addheader(response,respindex);
+			response = addfield(response, default_http_connection,&responsebuffersize);
+			response = addfield(response, default_http_contenttype,&responsebuffersize);
+			response = addfield(response, default_http_cache_control,&responsebuffersize);
+			char timestr[bufsize];
+			response = addfield(response, get_default_http_date(timestr,bufsize),&responsebuffersize);
+		}else{
+			//todo we always need some kind of response?
+		}
+
+		DBGMSG("RESPONSE: $%s", response);
 
 	/*********  send response *******************************/
+		TRACE
+		int sent=0;
+		int bytesout = send(socket,response,strlen(response),flag);
+		if (bytesout==0){
+			fprintf(stderr, "remote closed connection, child closing\n");
+			release_connection_resources(msgbuf);
+			return;
+		}else if (bytesout<0){
+			perror("send error:");
+		}else {// if (bytesout>0){
+			while(bytesout<(int)strlen(response)){
+				sent+=bytesout;
+				bytesout = send(socket,response+sent,strlen(response+sent),flag);
+				if (bytesout==0){
+							fprintf(stderr, "remote closed connection, child closing\n");
+							release_connection_resources(msgbuf);
+							release_connection_resources(response);
+							return;
+				}
+				if (bytesout<0)
+					perror("recv error:");
+			}
+		}
 
+		if (!persist_connection){
+			TRACE
+			release_connection_resources(msgbuf);
+			release_connection_resources(response);
+			break;
+		}
+		TRACE
 	} while( bytesin >0);
 
 
