@@ -21,44 +21,44 @@
 #define bufsize 256
 
 const char* responsestr[] ={
-		"100 Continue",
-		"101 Switching Protocols",
-		"200 OK",
-		"201 Created",
-		"202 Accepted",
+		"100 Continue", //0
+		"101 Switching Protocols", //1
+		"200 OK",		//2
+		"201 Created",	//3
+		"202 Accepted",	//4
 		"203 Non-Authoritative Information",
-		"204 No Content",
-		"205 Reset Content",
-		"206 Partial Content",
-		"300 Multiple Choices",
-		"301 Moved Permanently",
+		"204 No Content",	//6
+		"205 Reset Content",	//7
+		"206 Partial Content",	//8
+		"300 Multiple Choices",	//9
+		"301 Moved Permanently",	//10
 		"302 Found",
 		"303 See Other",
 		"304 Not Modified",
 		"305 Use Proxy",
-		"307 Temporary Redirect",
-		"400 Bad Request",
-		"401 Unauthorized",
+		"307 Temporary Redirect", //15
+		"400 Bad Request",	//16
+		"401 Unauthorized",  //17
 		"402 Payment Required",
-		"403 Forbidden",
-		"404 Not Found",
-		"405 Method Not Allowed",
-		"406 Not Acceptable",
+		"403 Forbidden",	//19
+		"404 Not Found",	//20
+		"405 Method Not Allowed",	//21
+		"406 Not Acceptable",	//22
 		"407 Proxy Authentication Required",
-		"408 Request Timeout",
-		"409 Conflict",
-		"410 Gone",
-		"411 Length Required",
+		"408 Request Timeout", //24
+		"409 Conflict",	//25
+		"410 Gone",	//26
+		"411 Length Required"	//27,
 		"412 Precondition Failed",
-		"413 Request Entity Too Large",
-		"414 Request-URI Too Long",
+		"413 Request Entity Too Large",	//29
+		"414 Request-URI Too Long",	//30
 		"415 Unsupported Media Type",
 		"416 Requested Range Not Satisfiable",
 		"417 Expectation Failed",
-		"500 Internal Server Error",
-		"501 Not Implemented",
+		"500 Internal Server Error", //34
+		"501 Not Implemented",  //35
 		"502 Bad Gateway",
-		"503 Service Unavailable",
+		"503 Service Unavailable",  //36
 		"504 Gateway Timeout",
 		"505 HTTP Version Not Supported"
 };
@@ -134,13 +134,13 @@ int command_from_string(const char* path){
 	//fist char should be a slash that can be ignored
 	//all commands must be relative to root
 	const char* p=path+1;
-	for (i=0; i< CMDCLOSE; i++){
+	for (i=0; i<= CMDCLOSE; i++){
 		if (!strncasecmp(p, server_commands[i], strlen(server_commands[i]))){
-			//matched
+			DBGMSG("returning %i, %s\n", i, server_commands[i]);
 			return i;
 		}
 	}
-	//not found
+	DBGMSG("no command found, returning %i\n", -1);
 	return -1;
 }
 
@@ -273,7 +273,7 @@ void handle_client(int socket) {
 			fprintf(stderr, "strlen msgbug = %d\n", (int)strlen(msgbuf)	);
 		}
 
-		hexprint(msgbuf, msgsize+2);
+		//hexprint(msgbuf, msgsize+2);
 		DBGMSG("complete message %d\n" , __LINE__);
 		//now have complete first part of message since we have blank line ie \r\n\r\n
 		fprintf(stderr, "received:$%s$\n",msgbuf);
@@ -381,17 +381,20 @@ void handle_client(int socket) {
 			fprintf(stderr,"unknown method called %d \n", method);
 			break;
 		default:
+
+
 			break;
 		}
 
 		TRACE
 	/********** build response ******************************/
 		TRACE
-		hexprint(path, strlen(path)+2);
+		//hexprint(path, strlen(path)+2);
 		int respindex;
 		int contlength=0;
 		int cmd = command_from_string(path);
 		char* body;
+		//char cmdresponsefields[bufsize];
 
 		switch (cmd){
 		case CMDLOGIN:
@@ -408,6 +411,19 @@ void handle_client(int socket) {
 			DBGMSG("content length = %d\n",contlength);
 			break;
 		case CMDBROWSER:
+			TRACE
+			respindex=2;
+			body = (char*)malloc(bufsize);
+			memset(body,'\0',bufsize);
+			char* useragent = http_parse_header_field(msgbuf, bufsize, "User-Agent");
+			if (useragent){
+				strcpy(body, useragent);
+			}else{
+				respindex=6;
+			}
+			TRACE
+			contlength=strlen(body);
+			DBGMSG("content length = %d\n",contlength);
 			break;
 		case CMDREDIRECT:
 			break;
@@ -422,8 +438,24 @@ void handle_client(int socket) {
 		case CMDCHECKOUT:
 			break;
 		case CMDCLOSE:
+			TRACE
+			persist_connection=0;
+			respindex=2;
+			body = (char*)malloc(bufsize);
+			memset(body,'\0',bufsize);
+			strcpy(body, "The connection will now be closed");
+			contlength=strlen(body);
+			DBGMSG("content length = %d\n",contlength);
 			break;
 		case -1:
+			TRACE
+			respindex=20;
+			body = (char*)malloc(bufsize);
+			memset(body,'\0',bufsize);
+			sprintf(body,"%s",responsestr[respindex]);
+			contlength=strlen(body);
+			DBGMSG("content length = %d\n",contlength);
+			break;
 		default:
 			break;
 		}
@@ -440,6 +472,7 @@ void handle_client(int socket) {
 			char timestr[bufsize];
 			char* timefield = get_default_http_date(timestr,bufsize);
 			response = addfield(response, timefield,&responsebuffersize);
+
 
 			if (contlength!=0){
 				TRACE
