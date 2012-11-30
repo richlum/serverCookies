@@ -158,7 +158,7 @@ char* addheader(char* to, int respidx){
 //
 char* addfield(char* to, const char* from, unsigned int* to_bufsize){
 	while ((*to_bufsize-strlen(to))<=(strlen(from)+3)){
-		doubleBufferSize(to,to_bufsize);
+		to=doubleBufferSize(to,to_bufsize);
 	}
 	strcat(to,from	);
 	strcat(to,lineend);
@@ -344,13 +344,11 @@ void handle_client(int socket) {
 		case METHOD_GET:
 			path = http_parse_path(http_parse_uri(msgbuf));
 			fprintf(stderr, "path=%s\n", path );
-
 			//extract attributes?
 			TRACE
 			break;
 		case METHOD_POST:
 			//handle partial request
-
 			path = http_parse_path(msgbuf);
 			fprintf(stderr, "path=%s\n", path );
 			//char* value = http_parse_header_field(msgbuf,*msgbufsize,(const char*)"Content-length");
@@ -365,10 +363,7 @@ void handle_client(int socket) {
 			}else{
 				fprintf(stderr, "body = %s\n\n",abody);
 			}
-
-
 			break;
-
 		case METHOD_HEAD:
 		case METHOD_OPTIONS:
 		case METHOD_PUT:
@@ -483,8 +478,11 @@ void handle_client(int socket) {
 			response = addfield(response, "" ,&responsebuffersize);
 
 			if (contlength!=0){
-				TRACE
+				hexprint(body,strlen(body));
+				hexprint(response,strlen(response));
 				response = addfield(response, body,&responsebuffersize);
+				TRACE
+				hexprint(response,strlen(response));
 			}
 
 		}else{

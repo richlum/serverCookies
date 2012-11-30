@@ -297,6 +297,7 @@ int is_httpVer_1_0(char* buf){
 	}
 	return 0;
 }
+extern void hexprint(const char* buf, int len);
 
 // allocate double size buffer, copy old to new,
 // free old, repoint buffer to new
@@ -304,9 +305,12 @@ int is_httpVer_1_0(char* buf){
 char* doubleBufferSize(char* buffer, unsigned int* msgbufsize){
 	fprintf(stderr,"strlen(buffer)= %zu, msgbufsize = %d\n", 
 		strlen(buffer), *msgbufsize);
+
 	char* newbuffer = (char*)malloc(2*(*msgbufsize));
 	memset (newbuffer,'\0', 2*(*msgbufsize));
 	strncpy(newbuffer, buffer, *msgbufsize);
+	TRACE
+	hexprint (newbuffer, strlen(newbuffer));
 	free(buffer);
 	buffer=newbuffer;
 	newbuffer=NULL;
