@@ -90,6 +90,7 @@ const char* default_http_contenttype = "Content-Type: text/plain";
 const char* default_http_cache_control = "Cache-Control: public";
 const char* lineend = "\r\n";
 const char* default_http_cookie_opt = "; path=/; Max-Age=86400;";
+const char* expirenow_http_cookie_opt = "; path=/; Max-Age=0;";
 const char* default_http_cookie_header = "Set-Cookie: ";
 const char* timeformatstr ="%a, %d %b %Y %T %Z";
 
@@ -204,7 +205,7 @@ char* get_http_content_length(int contlength,char* contlenstr){
 
 //given path that includes arguments
 // extract the argument that has the given name
-const char* getargvalue(const char* argname, const char* path, char* value){
+char* getargvalue(const char* argname, const char* path, char* value){
 	TRACE
 	char* p = strchr(path, '?');
 	p++;
@@ -511,9 +512,10 @@ void handle_client(int socket) {
 		}else{
 
 			switch (cmd){
-			case CMDLOGIN:
+			case CMDLOGIN:  ;  //http://shareprogrammingtips.com/c-language-programming-tips/why-variables-can-not-be-declared-in-a-switch-statement-just-after-labels/
 				TRACE
-				const char* user = getargvalue("username", path, username);
+				char* user = getargvalue("username", path, username);
+
 				DBGMSG("user = %s\n", user);
 				if (user){
 					char decodeduser[bufsize];
@@ -543,6 +545,19 @@ void handle_client(int socket) {
 			case CMDLOGOUT:
 				TRACE
 				if (strlen(usernamevalue)>0){
+					if ((strlen(cmdresponsefields))!=0){
+						strcat (cmdresponsefields,lineend);
+					}
+					strcat(cmdresponsefields, default_http_cookie_header);
+					strcat(cmdresponsefields, " username=");
+					char encodedname[bufsize*3+1];
+					strcat(cmdresponsefields, encode(usernamevalue,encodedname));
+					strcat(cmdresponsefields, expirenow_http_cookie_opt);
+
+					respindex=2;
+					strcpy(usernamebody,"User ");
+					strcat(usernamebody,usernamevalue);
+					strcat(usernamebody," was logged out");
 
 				}else{
 					respindex=16;
