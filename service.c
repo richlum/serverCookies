@@ -86,6 +86,7 @@ const char* server_commands[] = {
 
 const char* httpver = "HTTP/1.1";
 const char* default_http_connection = "Connection: keep-alive";
+const char* close_http_connection ="Connection: close";
 const char* default_http_contenttype = "Content-Type: text/plain";
 const char* default_http_cache_control = "Cache-Control: public";
 const char* nocache_http_cache_control = "Cache-Control: no-cache";
@@ -648,6 +649,7 @@ void handle_client(int socket) {
 				TRACE
 				persist_connection=0;
 				respindex=2;
+				resp.connection=CLOSE;
 				strcpy(body, "The connection will now be closed");
 				contlength=strlen(body);
 				DBGMSG("content length = %d\n",contlength);
@@ -671,7 +673,10 @@ void handle_client(int socket) {
 			memset(response,'\0',bufsize);
 			unsigned int   responsebuffersize=bufsize;
 			response = addheader(response,respindex);
-			response = addfield(response, default_http_connection,&responsebuffersize);
+			if (resp.connection==CLOSE)
+				response = addfield(response, close_http_connection,&responsebuffersize);
+			else
+				response = addfield(response, default_http_connection,&responsebuffersize);
 			response = addfield(response, default_http_contenttype,&responsebuffersize);
 			if (resp.cache==NOCACHE)
 				response = addfield(response, nocache_http_cache_control,&responsebuffersize);
