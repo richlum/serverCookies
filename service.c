@@ -88,6 +88,7 @@ const char* httpver = "HTTP/1.1";
 const char* default_http_connection = "Connection: keep-alive";
 const char* default_http_contenttype = "Content-Type: text/plain";
 const char* default_http_cache_control = "Cache-Control: public";
+const char* nocache_http_cache_control = "Cache-Control: no-cache";
 const char* lineend = "\r\n";
 const char* default_http_cookie_opt = "; path=/; Max-Age=86400;";
 const char* expirenow_http_cookie_opt = "; path=/; Max-Age=0;";
@@ -591,6 +592,7 @@ void handle_client(int socket) {
 
 				body = get_localtime(body,bufsize);
 				contlength=strlen(body);
+				resp.cache=NOCACHE;
 				DBGMSG("content length = %d\n",contlength);
 				break;
 			case CMDBROWSER:
@@ -654,7 +656,10 @@ void handle_client(int socket) {
 			response = addheader(response,respindex);
 			response = addfield(response, default_http_connection,&responsebuffersize);
 			response = addfield(response, default_http_contenttype,&responsebuffersize);
-			response = addfield(response, default_http_cache_control,&responsebuffersize);
+			if (resp.cache==NOCACHE)
+				response = addfield(response, nocache_http_cache_control,&responsebuffersize);
+			else
+				response = addfield(response, default_http_cache_control,&responsebuffersize);
 			char timestr[bufsize];
 			char* timefield = get_default_http_date(timestr,bufsize);
 			response = addfield(response, timefield,&responsebuffersize);
