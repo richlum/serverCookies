@@ -20,6 +20,7 @@
 #include <assert.h>
 
 #define bufsize 256
+#define maxcookiesize 4096
 
 const char* responsestr[] ={
 		"100 Continue", //0
@@ -255,6 +256,12 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		value[i]='\0';
 		TRACE
 		DBGMSG("%d, value=%s\n", strlen(value), value);
+
+		char* decodedvalue = (char*)malloc (strlen(value));
+		decodedvalue = decode(value,decodedvalue);
+		strcpy (value, decodedvalue);
+		free(decodedvalue);
+		decodedvalue=NULL;
 		return value;
 	}
 	return NULL;
@@ -503,7 +510,7 @@ void handle_client(int socket) {
 		int contlength=0;
 		int cmd = command_from_string(path);
 
-		char username[bufsize];
+		char username[maxcookiesize];
 		// init http response fields to be added
 		char cmdresponsefields[bufsize];
 		memset (cmdresponsefields,'\0',bufsize);
@@ -542,10 +549,10 @@ void handle_client(int socket) {
 
 				//DBGMSG("user = %s\n", user);
 				if (user){
-					char decodeduser[bufsize];
-					if (strlen(user)>bufsize)
-							fprintf(stderr,"User Name too long\n");
-					user = decode(user,decodeduser);
+//					char decodeduser[bufsize];
+//					if (strlen(user)>bufsize)
+//							fprintf(stderr,"User Name too long\n");
+//					user = decode(user,decodeduser);
 
 					if ((strlen(cmdresponsefields))!=0){
 						strcat (cmdresponsefields,lineend);
