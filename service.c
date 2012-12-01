@@ -94,6 +94,24 @@ const char* expirenow_http_cookie_opt = "; path=/; Max-Age=0;";
 const char* default_http_cookie_header = "Set-Cookie: ";
 const char* timeformatstr ="%a, %d %b %Y %T %Z";
 
+typedef enum  {
+	NOCONTENTTYPE, PLAIN, APPL_OCTET
+}contenttype;
+typedef enum {
+	NOCONNECTION, CLOSE, KEEPALIVE
+}connectiontype;
+typedef enum{
+	NOCACHECONTROL, NOCACHE, PRIVATE, PUBLIC
+}cachecontrol;
+
+
+typedef struct resp_setting{
+	contenttype 	content;
+	connectiontype  connection;
+	cachecontrol	cache;
+	int				contentlength;
+} resp_setting;
+
 void hexprint(const char* buf, int len){
 
 	int i ;
@@ -307,7 +325,7 @@ void handle_client(int socket) {
 
 //	char* value;
 	//int len;
-	int content_length;
+	//int content_length;
 
 
 	// if true will loop waiting for more data
@@ -315,11 +333,12 @@ void handle_client(int socket) {
 	// connectionheader value recived
 	char* connection_value;
 
-
 	unsigned int mbufsize = bufsize;
 	unsigned int *msgbufsize= &mbufsize;
 	msgbuf=(char*) malloc(*msgbufsize);
 	int bytesin=0;
+	resp_setting resp;
+	resp = (resp_setting){ 0,0,0,0};
 	do{
 		memset(msgbuf,'\0', *msgbufsize);
 		TRACE
@@ -373,22 +392,23 @@ void handle_client(int socket) {
 		DBGMSG("sizeofHeader = %d\n", sizeofheader);
 
 	/****   get rest of body (if any) **************/
-		content_length = getContentLength(msgbuf,msgsize);
-		if (content_length>0){
-			DBGMSG("content length = %d\n",content_length);
+		//content_length = getContentLength(msgbuf,msgsize);
+		resp.contentlength = getContentLength(msgbuf,msgsize);
+		if (resp.contentlength>0){
+			DBGMSG("content length = %d\n",resp.contentlength);
 			int read = msgsize - sizeofheader;
-			if (sizeleft<content_length-read){
+			if (sizeleft<resp.contentlength-read){
 				// incr size should be min of contentlength-read-sizeleft
-				msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, content_length);
+				msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, resp.contentlength);
 				sizeleft= *msgbufsize - msgsize -1;
 			}
 			TRACE
 			DBGMSG("read = %d\n",read);
 			DBGMSG("msgsize = %d\n",msgsize);
 
-			while(read<content_length){
+			while(read<resp.contentlength){
 				//get the missing body parts
-				DBGMSG("missing %d bytes from body",content_length-read);
+				DBGMSG("missing %d bytes from body",resp.contentlength-read);
 				char* appendbuf = msgbuf + msgsize;
 				bytesin = recv(socket, appendbuf, sizeleft, flag);
 				if (bytesin==0){
@@ -516,7 +536,7 @@ void handle_client(int socket) {
 				TRACE
 				char* user = getargvalue("username", path, username);
 
-				DBGMSG("user = %s\n", user);
+				//DBGMSG("user = %s\n", user);
 				if (user){
 					char decodeduser[bufsize];
 					if (strlen(user)>bufsize)
