@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror -g -Wextra -Wno-unused-parameter -DDEBUG
+CFLAGS=-Wall -Werror -g -Wextra -Wno-unused-parameter 
 LDFLAGS=
 
 all: cshttp
@@ -13,3 +13,7 @@ test_util.o: test_util.c util.h
 
 clean:
 	-rm -rf cshttp.o service.o util.o cshttp test_util.o 
+
+#############
+debug: CFLAGS += -DDEBUG 
+debug: all

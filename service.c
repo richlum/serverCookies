@@ -17,6 +17,7 @@
 #include <time.h>
 #include "service.h"
 #include "util.h"
+#include <assert.h>
 
 #define bufsize 256
 
@@ -237,11 +238,58 @@ const char* getargvalue(const char* argname, const char* path, char* value){
 }
 
 
+char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuestore){
+	TRACE
+	char* p = cookieptr;
+	char* result;
+	// expecting ptr to first attribute name or blanks preceding it.
+	TRACE
+	DBGMSG("p=%s\n",p);
+	while (*p==' '){
+		p++;
+	}
+	TRACE
+	DBGMSG("p=%s\n",p);
+	while((*p!='\0')&&(*p!='\r')&&(*p!='\n')
+			&&(strncasecmp(p,attribName,strlen(attribName)!=0))){
+		p=strchr(p,';');
+		if (!p)
+			return NULL;
+		p++;
+		DBGMSG("p=%s\n",p);
+		while((*p==' '))
+			p++;
+	}
+	//have ptr to attribute name
+	TRACE
+	DBGMSG("p=%s\n",p);
+	if ((*p!='\0')&&(*p!='\r')&&(*p!='\n')){
+		p=strchr(p,'=');
+		p++;
+		//finally have *p pointing to value of attribName
+		int i=0;
+		char value[bufsize];
+		while((*p!='\0')&&(*p!='\r')&&(*p!='\n')){
+			value[i++]=*p;
+			p++;
+		}
+		value[i]='\0';
+		assert (i<=bufsize);
+		result = decode(value, valuestore) ;
+		DBGMSG("decoded attribute=%s\n",result);
+		return result;
+	}
+	TRACE
+	return NULL;
+}
+
 void handle_client(int socket) {
     
-    /* TODO Loop receiving requests and sending appropriate responses,
-     *      until one of the conditions to close the connection is
-     *      met.
+    /* TODO REFACTOR This.
+     * It's one big ugly do loop but wasnt sure what I needed
+     * access to during developement.  Once it works, we need to
+     * pull up some methods to make it more readable and define
+     * interfaces for sub methods.
      */
 	TRACE
 	//request message - accumulates unitl \r\n\r\n
@@ -265,11 +313,7 @@ void handle_client(int socket) {
 	int persist_connection=1;
 	// connectionheader value recived
 	char* connection_value;
-	//initialize usernamebody that will retain same value
-	// within loop unless explict; changed by login/logout;
-	char* usernamebody;
-	usernamebody = (char*)malloc(bufsize);
-	memset(usernamebody,'\0',bufsize);
+
 
 	unsigned int mbufsize = bufsize;
 	unsigned int *msgbufsize= &mbufsize;
@@ -387,14 +431,14 @@ void handle_client(int socket) {
 
 		case METHOD_GET:
 			path = http_parse_path(http_parse_uri(msgbuf));
-			fprintf(stderr, "path=%s\n", path );
-			//extract attributes?
+			DBGMSG("path=%s\n", path );
+
 			TRACE
 			break;
 		case METHOD_POST:
 			//handle partial request
 			path = http_parse_path(msgbuf);
-			fprintf(stderr, "path=%s\n", path );
+			DBGMSG("path=%s\n", path );
 			//char* value = http_parse_header_field(msgbuf,*msgbufsize,(const char*)"Content-length");
 	//			contentlength=atoi(value);
 	//			// is this count include /r/n - exclude headers?
@@ -442,6 +486,16 @@ void handle_client(int socket) {
 		body = (char*)malloc(bufsize);
 		memset(body,'\0',bufsize);
 
+		//initialize usernamebody that will be set by login or cookie
+		// in requests
+		char* usernamebody;
+		usernamebody = (char*)malloc(bufsize);
+		memset(usernamebody,'\0',bufsize);
+		char * cookieptr = http_parse_header_field(msgbuf, sizeofheader, "Cookie");
+		strcpy (usernamebody,"Username: ");
+		char user[bufsize];
+		char* usernamevalue = getdecodedCookieAttribute(cookieptr, "username", user);
+		strcat (usernamebody,usernamevalue);
 
 		switch (cmd){
 		case CMDLOGIN:
@@ -449,17 +503,22 @@ void handle_client(int socket) {
 			const char* user = getargvalue("username", path, username);
 			DBGMSG("user = %s\n", user);
 			if (user){
+				char decodeduser[bufsize];
+				if (strlen(user)>bufsize)
+						fprintf(stderr,"User Name too long\n");
+				user = decode(user,decodeduser);
+
 				if ((strlen(cmdresponsefields))!=0){
 					strcat (cmdresponsefields,lineend);
 				}
 				strcat(cmdresponsefields, default_http_cookie_header);
 				strcat(cmdresponsefields, " username=");
-				strcat(cmdresponsefields, username);
+				strcat(cmdresponsefields, user);
 				strcat(cmdresponsefields, default_http_cookie_opt);
 
 				respindex=2;
 				strcpy(usernamebody,"Username: ");
-				strcat(usernamebody,username);
+				strcat(usernamebody,user);
 				//strcat(usernamebody,lineend);
 				DBGMSG(" usernamebody = %s\n", usernamebody);
 			}else{
