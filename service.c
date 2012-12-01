@@ -105,7 +105,9 @@ typedef enum{
 	NOCACHECONTROL, NOCACHE, PRIVATE, PUBLIC
 }cachecontrol;
 
-
+//todo this was added in later.  so far contentlength is used
+//cache is only used to set no-cache option.
+// others and defaults ignore this structure for now.
 typedef struct resp_setting{
 	contenttype 	content;
 	connectiontype  connection;
@@ -610,6 +612,21 @@ void handle_client(int socket) {
 				break;
 			case CMDREDIRECT:
 				TRACE
+				respindex=12;
+				char* location = getargvalue("url", path, username);
+
+				//DBGMSG("user = %s\n", user);
+				if (location){
+					char* decodedlocation = (char*)malloc(strlen(location));
+					decodedlocation = decode(location,decodedlocation);
+
+					if ((strlen(cmdresponsefields))!=0){
+						strcat (cmdresponsefields,lineend);
+					}
+					strcat(cmdresponsefields, "Location: ");
+					strcat(cmdresponsefields, decodedlocation);
+				}
+
 				break;
 			case CMDGETFILE:
 				TRACE
