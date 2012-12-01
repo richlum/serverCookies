@@ -4,3 +4,18 @@ Connection: keep-alive
 
 Hello World!
 
+
+GET http://lulu.ugrad.cs.ubc.ca:8080/servertime HTTP/1.1
+
+
+GET http://lulu.ugrad.cs.ubc.ca:8080/browser HTTP/1.1
+
+GET http://lulu.ugrad.cs.ubc.ca:8080/close HTTP/1.1
+
+GET http://lulu.ugrad.cs.ubc.ca:8080/a/b/c/servertime?format=local HTTP/1.1
+
+
+GET http://lulu.ugrad.cs.ubc.ca:8080/login?username=rlum HTTP/1.1
+
+GET http://localhost:9999/login?username=rlum HTTP/1.1
+GET http://lulu.ugrad.cs.ubc.ca:9999/login?username=rlum HTTP/1.1

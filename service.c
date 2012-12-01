@@ -88,6 +88,9 @@ const char* default_http_connection = "Connection: keep-alive";
 const char* default_http_contenttype = "Content-Type: text/plain";
 const char* default_http_cache_control = "Cache-Control: public";
 const char* lineend = "\r\n";
+const char* default_http_cookie_opt = "; path=/; Max-Age=86400;";
+const char* default_http_cookie_header = "Set-Cookie: ";
+const char* timeformatstr ="%a, %d %b %Y %T %Z";
 
 void hexprint(const char* buf, int len){
 
@@ -169,9 +172,9 @@ char* addfield(char* to, const char* from, unsigned int* to_bufsize){
 char* get_default_http_date(char* str,int len){
 	char timestr[bufsize];
 	time_t timer = time(&timer);
-	char* fmt ="%a %b %d %H:%M:%S %Z %Y";
+	//char* fmt ="%a %b %d %H:%M:%S %Z %Y";
 	struct tm* currtime = gmtime(&timer);
-	strftime(timestr,bufsize,fmt,currtime);
+	strftime(timestr,bufsize,timeformatstr,currtime);
 	strcpy (str, "Date: ");
 	strcat (str, timestr);
 	DBGMSG("datefield = %s\n",str);
@@ -182,9 +185,9 @@ char* get_default_http_date(char* str,int len){
 // get the date for http respone field output
 char* get_localtime(char* str,int len){
 	time_t timer = time(&timer);
-	char* fmt ="%a %b %d %H:%M:%S %Z %Y";
+	//char* fmt ="%a %b %d %H:%M:%S %Z %Y";
 	struct tm* currtime = localtime(&timer);
-	strftime(str,len,fmt,currtime);
+	strftime(str,len,timeformatstr,currtime);
 	DBGMSG("localtime = %s\n",str);
 	return str;
 }
@@ -197,6 +200,42 @@ char* get_http_content_length(int contlength,char* contlenstr){
 	strcat( contlenstr, sizestr);
 	return contlenstr;
 }
+
+//given path that includes arguments
+// extract the argument that has the given name
+const char* getargvalue(const char* argname, const char* path, char* value){
+	TRACE
+	char* p = strchr(path, '?');
+	p++;
+	DBGMSG("p=%s\n", p);
+	DBGMSG("argname=%s\n",argname);
+	int match;
+	while(((match=(!strncasecmp(p,argname,strlen(argname))))==0)&&(p)){
+		p=strchr(p,'&');
+		if (p)
+			p++;
+		TRACE
+		DBGMSG("p=%s\n", p);
+	}
+	if ((match)&&p){
+
+		int i=0;
+		p=strchr(p,'=');
+		p++;
+		TRACE
+		DBGMSG("p=%s\n", p);
+		while((*p!=' ')&&(*p!='&')&&(*p!='\r')&&(*p!='\0')){
+			value[i++]=*p;
+			p++;
+		}
+		value[i]='\0';
+		TRACE
+		DBGMSG("%d, value=%s\n", strlen(value), value);
+		return value;
+	}
+	return NULL;
+}
+
 
 void handle_client(int socket) {
     
@@ -226,6 +265,11 @@ void handle_client(int socket) {
 	int persist_connection=1;
 	// connectionheader value recived
 	char* connection_value;
+	//initialize usernamebody that will retain same value
+	// within loop unless explict; changed by login/logout;
+	char* usernamebody;
+	usernamebody = (char*)malloc(bufsize);
+	memset(usernamebody,'\0',bufsize);
 
 	unsigned int mbufsize = bufsize;
 	unsigned int *msgbufsize= &mbufsize;
@@ -388,19 +432,48 @@ void handle_client(int socket) {
 		int respindex;
 		int contlength=0;
 		int cmd = command_from_string(path);
+
+		char username[bufsize];
+		// init http response fields to be added
+		char cmdresponsefields[bufsize];
+		memset (cmdresponsefields,'\0',bufsize);
+		//initialize body of response
 		char* body;
-		//char cmdresponsefields[bufsize];
+		body = (char*)malloc(bufsize);
+		memset(body,'\0',bufsize);
+
 
 		switch (cmd){
 		case CMDLOGIN:
+			TRACE
+			const char* user = getargvalue("username", path, username);
+			DBGMSG("user = %s\n", user);
+			if (user){
+				if ((strlen(cmdresponsefields))!=0){
+					strcat (cmdresponsefields,lineend);
+				}
+				strcat(cmdresponsefields, default_http_cookie_header);
+				strcat(cmdresponsefields, " username=");
+				strcat(cmdresponsefields, username);
+				strcat(cmdresponsefields, default_http_cookie_opt);
+
+				respindex=2;
+				strcpy(usernamebody,"Username: ");
+				strcat(usernamebody,username);
+				//strcat(usernamebody,lineend);
+				DBGMSG(" usernamebody = %s\n", usernamebody);
+			}else{
+				// 400 bad request
+				respindex=16;
+			}
 			break;
 		case CMDLOGOUT:
+			TRACE
 			break;
 		case CMDSERVERTIME:
 			TRACE
-			respindex=2;
-			body = (char*)malloc(bufsize);
-			memset(body,'\0',bufsize);
+			respindex=2;  //ok
+
 			body = get_localtime(body,bufsize);
 			contlength=strlen(body);
 			DBGMSG("content length = %d\n",contlength);
@@ -408,8 +481,6 @@ void handle_client(int socket) {
 		case CMDBROWSER:
 			TRACE
 			respindex=2;
-			body = (char*)malloc(bufsize);
-			memset(body,'\0',bufsize);
 			char* useragent = http_parse_header_field(msgbuf, bufsize, "User-Agent");
 			if (useragent){
 				strcpy(body, useragent);
@@ -421,23 +492,28 @@ void handle_client(int socket) {
 			DBGMSG("content length = %d\n",contlength);
 			break;
 		case CMDREDIRECT:
+			TRACE
 			break;
 		case CMDGETFILE:
+			TRACE
 			break;
 		case CMDPUTFILE:
+			TRACE
 			break;
 		case CMDADDCART:
+			TRACE
+
 			break;
 		case CMDDELCART:
+			TRACE
 			break;
 		case CMDCHECKOUT:
+			TRACE
 			break;
 		case CMDCLOSE:
 			TRACE
 			persist_connection=0;
 			respindex=2;
-			body = (char*)malloc(bufsize);
-			memset(body,'\0',bufsize);
 			strcpy(body, "The connection will now be closed");
 			contlength=strlen(body);
 			DBGMSG("content length = %d\n",contlength);
@@ -445,8 +521,6 @@ void handle_client(int socket) {
 		case -1:
 			TRACE
 			respindex=20;
-			body = (char*)malloc(bufsize);
-			memset(body,'\0',bufsize);
 			sprintf(body,"%s",responsestr[respindex]);
 			contlength=strlen(body);
 			DBGMSG("content length = %d\n",contlength);
@@ -468,6 +542,15 @@ void handle_client(int socket) {
 			char* timefield = get_default_http_date(timestr,bufsize);
 			response = addfield(response, timefield,&responsebuffersize);
 
+			if (strlen(cmdresponsefields)>0){
+				TRACE
+				response = addfield(response, cmdresponsefields,&responsebuffersize);
+			}
+
+			// adjust content length: prepend all output with username info if any
+			if (strlen(usernamebody)!=0){
+					contlength += strlen(usernamebody) + strlen(lineend) ;
+			}
 
 			if (contlength!=0){
 				TRACE
@@ -477,16 +560,23 @@ void handle_client(int socket) {
 
 			response = addfield(response, "" ,&responsebuffersize);
 
+			// attach the body now
+			// prepend username before response
+			if (strlen(usernamebody)!=0){
+					response = addfield(response, usernamebody, &responsebuffersize);
+			}
+			// response body
 			if (contlength!=0){
-				hexprint(body,strlen(body));
-				hexprint(response,strlen(response));
 				response = addfield(response, body,&responsebuffersize);
 				TRACE
-				hexprint(response,strlen(response));
+				//hexprint(response,strlen(response));
 			}
 
 		}else{
 			//todo we always need some kind of response?
+			TRACE
+			//we should never get here since all cases should be handled
+			//above already
 		}
 
 		DBGMSG("RESPONSE: $%s", response);
@@ -497,7 +587,7 @@ void handle_client(int socket) {
 		int bytesout = send(socket,response,strlen(response),flag);
 		if (bytesout==0){
 			fprintf(stderr, "remote closed connection, child closing\n");
-			release_connection_resources(msgbuf);
+			persist_connection=0;
 			return;
 		}else if (bytesout<0){
 			perror("send error:");
@@ -507,9 +597,8 @@ void handle_client(int socket) {
 				bytesout = send(socket,response+sent,strlen(response+sent),flag);
 				if (bytesout==0){
 							fprintf(stderr, "remote closed connection, child closing\n");
-							release_connection_resources(msgbuf);
-							release_connection_resources(response);
-							return;
+							persist_connection=0;
+							break;
 				}
 				if (bytesout<0)
 					perror("recv error:");
@@ -520,6 +609,11 @@ void handle_client(int socket) {
 			TRACE
 			release_connection_resources(msgbuf);
 			release_connection_resources(response);
+			release_connection_resources(body);
+			release_connection_resources(usernamebody);
+			int rc = close(socket);
+			if (rc<0)
+				perror("socket error while closing");
 			break;
 		}
 		TRACE
