@@ -426,18 +426,17 @@ void handle_client(int socket) {
 		//method
 		method = http_parse_method(msgbuf);
 		fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
-
+		int respindex=-1;
+		path = http_parse_path(http_parse_uri(msgbuf));
 		switch (method){
 
 		case METHOD_GET:
-			path = http_parse_path(http_parse_uri(msgbuf));
 			DBGMSG("path=%s\n", path );
 
 			TRACE
 			break;
 		case METHOD_POST:
 			//handle partial request
-			path = http_parse_path(msgbuf);
 			DBGMSG("path=%s\n", path );
 			//char* value = http_parse_header_field(msgbuf,*msgbufsize,(const char*)"Content-length");
 	//			contentlength=atoi(value);
@@ -459,9 +458,11 @@ void handle_client(int socket) {
 		case METHOD_TRACE:
 		case METHOD_CONNECT:
 			fprintf(stderr,"Unspported Method called %s \n", http_method_str[method]);
+			respindex=34;
 			break;
 		case METHOD_UNKNOWN:
 			fprintf(stderr,"unknown method called %d \n", method);
+			respindex=34;
 			break;
 		default:
 
@@ -470,10 +471,10 @@ void handle_client(int socket) {
 		}
 
 		TRACE
-	/********** build response ******************************/
+	/********** process cmd to  build response ******************************/
 		TRACE
 		//hexprint(path, strlen(path)+2);
-		int respindex;
+
 		int contlength=0;
 		int cmd = command_from_string(path);
 
@@ -488,106 +489,128 @@ void handle_client(int socket) {
 
 		//initialize usernamebody that will be set by login or cookie
 		// in requests
+		char* usernamevalue=NULL;
 		char* usernamebody;
 		usernamebody = (char*)malloc(bufsize);
 		memset(usernamebody,'\0',bufsize);
 		char * cookieptr = http_parse_header_field(msgbuf, sizeofheader, "Cookie");
-		strcpy (usernamebody,"Username: ");
-		char user[bufsize];
-		char* usernamevalue = getdecodedCookieAttribute(cookieptr, "username", user);
-		strcat (usernamebody,usernamevalue);
-
-		switch (cmd){
-		case CMDLOGIN:
-			TRACE
-			const char* user = getargvalue("username", path, username);
-			DBGMSG("user = %s\n", user);
-			if (user){
-				char decodeduser[bufsize];
-				if (strlen(user)>bufsize)
-						fprintf(stderr,"User Name too long\n");
-				user = decode(user,decodeduser);
-
-				if ((strlen(cmdresponsefields))!=0){
-					strcat (cmdresponsefields,lineend);
-				}
-				strcat(cmdresponsefields, default_http_cookie_header);
-				strcat(cmdresponsefields, " username=");
-				strcat(cmdresponsefields, user);
-				strcat(cmdresponsefields, default_http_cookie_opt);
-
-				respindex=2;
-				strcpy(usernamebody,"Username: ");
-				strcat(usernamebody,user);
-				//strcat(usernamebody,lineend);
-				DBGMSG(" usernamebody = %s\n", usernamebody);
-			}else{
-				// 400 bad request
-				respindex=16;
-			}
-			break;
-		case CMDLOGOUT:
-			TRACE
-			break;
-		case CMDSERVERTIME:
-			TRACE
-			respindex=2;  //ok
-
-			body = get_localtime(body,bufsize);
-			contlength=strlen(body);
-			DBGMSG("content length = %d\n",contlength);
-			break;
-		case CMDBROWSER:
-			TRACE
-			respindex=2;
-			char* useragent = http_parse_header_field(msgbuf, bufsize, "User-Agent");
-			if (useragent){
-				strcpy(body, useragent);
-			}else{
-				respindex=6;
-			}
-			TRACE
-			contlength=strlen(body);
-			DBGMSG("content length = %d\n",contlength);
-			break;
-		case CMDREDIRECT:
-			TRACE
-			break;
-		case CMDGETFILE:
-			TRACE
-			break;
-		case CMDPUTFILE:
-			TRACE
-			break;
-		case CMDADDCART:
-			TRACE
-
-			break;
-		case CMDDELCART:
-			TRACE
-			break;
-		case CMDCHECKOUT:
-			TRACE
-			break;
-		case CMDCLOSE:
-			TRACE
-			persist_connection=0;
-			respindex=2;
-			strcpy(body, "The connection will now be closed");
-			contlength=strlen(body);
-			DBGMSG("content length = %d\n",contlength);
-			break;
-		case -1:
-			TRACE
-			respindex=20;
-			sprintf(body,"%s",responsestr[respindex]);
-			contlength=strlen(body);
-			DBGMSG("content length = %d\n",contlength);
-			break;
-		default:
-			break;
+		if (cookieptr&&(strlen(cookieptr)>0)){
+			strcpy (usernamebody,"Username: ");
+			char user[bufsize];
+			usernamevalue = getdecodedCookieAttribute(cookieptr, "username", user);
+			strcat (usernamebody,usernamevalue);
 		}
+		TRACE
+		if (respindex!=-1){
+			TRACE
+			//already encountered error condition from method
+			//create response here and skip cmd processing
+			strcpy (body, http_method_str[method]);
+			strcat (body, " : not implemented");
+			contlength=strlen(body);
+		}else{
 
+			switch (cmd){
+			case CMDLOGIN:
+				TRACE
+				const char* user = getargvalue("username", path, username);
+				DBGMSG("user = %s\n", user);
+				if (user){
+					char decodeduser[bufsize];
+					if (strlen(user)>bufsize)
+							fprintf(stderr,"User Name too long\n");
+					user = decode(user,decodeduser);
+
+					if ((strlen(cmdresponsefields))!=0){
+						strcat (cmdresponsefields,lineend);
+					}
+					strcat(cmdresponsefields, default_http_cookie_header);
+					strcat(cmdresponsefields, " username=");
+					strcat(cmdresponsefields, user);
+					strcat(cmdresponsefields, default_http_cookie_opt);
+
+					respindex=2;
+					strcpy(usernamebody,"Username: ");
+					strcat(usernamebody,user);
+					//strcat(usernamebody,lineend);
+					DBGMSG(" usernamebody = %s\n", usernamebody);
+				}else{
+					// 400 bad request
+					respindex=16;
+					strcpy(usernamebody,"No user name found");
+				}
+				break;
+			case CMDLOGOUT:
+				TRACE
+				if (strlen(usernamevalue)>0){
+
+				}else{
+					respindex=16;
+					strcpy(usernamebody,"Not Logged in");
+				}
+
+				break;
+			case CMDSERVERTIME:
+				TRACE
+				respindex=2;  //ok
+
+				body = get_localtime(body,bufsize);
+				contlength=strlen(body);
+				DBGMSG("content length = %d\n",contlength);
+				break;
+			case CMDBROWSER:
+				TRACE
+				respindex=2;
+				char* useragent = http_parse_header_field(msgbuf, bufsize, "User-Agent");
+				if (useragent){
+					strcpy(body, useragent);
+				}else{
+					respindex=6;
+				}
+				TRACE
+				contlength=strlen(body);
+				DBGMSG("content length = %d\n",contlength);
+				break;
+			case CMDREDIRECT:
+				TRACE
+				break;
+			case CMDGETFILE:
+				TRACE
+				break;
+			case CMDPUTFILE:
+				TRACE
+				break;
+			case CMDADDCART:
+				TRACE
+
+				break;
+			case CMDDELCART:
+				TRACE
+				break;
+			case CMDCHECKOUT:
+				TRACE
+				break;
+			case CMDCLOSE:
+				TRACE
+				persist_connection=0;
+				respindex=2;
+				strcpy(body, "The connection will now be closed");
+				contlength=strlen(body);
+				DBGMSG("content length = %d\n",contlength);
+				break;
+			case -1:
+				TRACE
+				respindex=20;
+				sprintf(body,"%s",responsestr[respindex]);
+				contlength=strlen(body);
+				DBGMSG("content length = %d\n",contlength);
+				break;
+			default:
+				break;
+			}
+		}
+/**************** assemble response *******************/
+		TRACE
 		char* response;
 		if (respindex>0){
 			response = (char*)malloc(bufsize);
