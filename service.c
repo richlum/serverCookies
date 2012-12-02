@@ -234,7 +234,11 @@ char* get_http_content_length(int contlength,char* contlenstr){
 char* getargvalue(const char* argname, const char* path, char* value){
 	TRACE
 
+	if (path==NULL)
+		return NULL;
 	char* p = strchr(path, '?');
+	if (p==NULL)
+		return NULL;
 	p++;
 	DBGMSG("p=%s\n", p);
 	DBGMSG("argname=%s\n",argname);
@@ -258,11 +262,15 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		p=strchr(p,'=');
 		p++;
 		TRACE
-		DBGMSG("p=%s\n", p);
-		while((*p!=' ')&&(*p!='&')&&(*p!='\r')&&(*p!='\0')){
+		if (p==NULL)
+			return NULL;
+		//DBGMSG("p=%s\n", p);
+		while((p!=NULL)&&(*p!=' ')&&(*p!='&')&&(*p!='\r')&&(*p!='\0')){
 			value[i++]=*p;
 			p++;
 		}
+		if (p==NULL)
+			return NULL;
 		value[i]='\0';
 		TRACE
 		DBGMSG("%d, value=%s\n", strlen(value), value);
@@ -427,7 +435,7 @@ void handle_client(int socket) {
 		}
 		if (bytesin<0)
 			perror("recv error:");
-
+		TRACE
 		int msgsize = bytesin;
 		fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
 		int sizeleft=0;
@@ -628,9 +636,16 @@ void handle_client(int socket) {
 			case CMDLOGIN:  ;  //http://shareprogrammingtips.com/c-language-programming-tips/why-variables-can-not-be-declared-in-a-switch-statement-just-after-labels/
 				;
 				TRACE
+				if (path==NULL){
+					TRACE
+					respindex=19;
+					strcpy (body, "No Path provided");
+					resp.contentlength=strlen(body);
+					break;
+				}
 				char* user = getargvalue("username", path, username);
-
-				if (user){
+				TRACE
+				if ((user)&&(strlen(user)>0)){
 					if ((strlen(cmdresponsefields))!=0){
 						strcat (cmdresponsefields,lineend);
 					}
@@ -644,13 +659,14 @@ void handle_client(int socket) {
 					strcat(usernamebody,user);
 					//strcat(usernamebody,lineend);
 				}else{
-					// 400 bad request
-					respindex=16;
+					respindex=19;
+					strcpy(body,"Not Logged in");
+					resp.contentlength+=strlen(body);
 				}
 				break;
 			case CMDLOGOUT:
 				TRACE
-				if (strlen(usernamevalue)>0){
+				if ((usernamevalue)&&(strlen(usernamevalue)>0)){
 					if ((strlen(cmdresponsefields))!=0){
 						strcat (cmdresponsefields,lineend);
 					}
@@ -666,10 +682,12 @@ void handle_client(int socket) {
 					strcat(usernamebody," was logged out");
 
 				}else{
-					respindex=16;
-					strcpy(usernamebody,"Not Logged in");
+					TRACE
+					respindex=19;
+					strcpy(body,"Not Logged in");
+					resp.contentlength+=strlen(body);
 				}
-
+				TRACE
 				break;
 			case CMDSERVERTIME:
 				TRACE
@@ -698,6 +716,13 @@ void handle_client(int socket) {
 				TRACE
 				respindex=12;
 				char* location = getargvalue("url", path, username);
+				if (location==NULL){
+					TRACE
+					respindex=19;
+					strcpy(body,"No url found");
+					resp.contentlength+=strlen(body);
+					break;
+				}
 
 				if (location){
 					char* decodedlocation = (char*)malloc(strlen(location));
@@ -758,8 +783,7 @@ void handle_client(int socket) {
 					itemcount++;
 					respindex=2;
 				}else{
-					// 400 bad request
-					respindex=16;
+					respindex=19;
 					strcpy(usernamebody,"No user name found");
 				}
 				TRACE
@@ -774,7 +798,7 @@ void handle_client(int socket) {
 				DBGMSG("del item = %s\n",delete_item);
 				if (delete_item==NULL){
 					TRACE
-					respindex=16;
+					respindex=19;
 					strcpy(usernamebody,"No itemnr found");
 					break;
 				}
@@ -949,7 +973,7 @@ void handle_client(int socket) {
 			case -1:
 				TRACE
 				respindex=20;
-				sprintf(body,"%s",responsestr[respindex]);
+				sprintf(body,"%s","Command not found");
 				//contlength=strlen(body);
 				resp.contentlength+=strlen(body);
 				DBGMSG("content length = %d\n",resp.contentlength);
