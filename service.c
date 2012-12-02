@@ -21,6 +21,8 @@
 
 #define bufsize 256
 #define maxcookiesize 4096
+#define MAXITEMS 12
+#define MAXITEMLEN 64
 
 const char* responsestr[] ={
 		"100 Continue", //0
@@ -262,6 +264,8 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		strcpy (value, decodedvalue);
 		free(decodedvalue);
 		decodedvalue=NULL;
+		TRACE
+		DBGMSG("%d, value=%s\n", strlen(value), value);
 		return value;
 	}
 	return NULL;
@@ -270,21 +274,32 @@ char* getargvalue(const char* argname, const char* path, char* value){
 
 char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuestore){
 	TRACE
+	DBGMSG("searching for (%d) attribute =%s\n", strlen(attribName),attribName);
 	char* p = cookieptr;
 	char* result;
 	// expecting ptr to first attribute name or blanks preceding it.
 	TRACE
+	if (p==NULL)
+		return NULL;
 	DBGMSG("p=%s\n",p);
 	while (*p==' '){
 		p++;
 	}
 	TRACE
 	DBGMSG("p=%s\n",p);
+	DBGMSG("*p=%x %c\n",*p, *p);
+	DBGMSG("attribName (%d) = %s\n", strlen(attribName), attribName);
+	int rc = strncasecmp(p,attribName,strlen(attribName));
+	DBGMSG("strncasecmp result = %d\n",rc );
 	while((*p!='\0')&&(*p!='\r')&&(*p!='\n')
-			&&(strncasecmp(p,attribName,strlen(attribName)!=0))){
+			&&(strncasecmp(p,attribName,strlen(attribName))!=0)){
 		p=strchr(p,';');
-		if (!p)
+		TRACE
+		DBGMSG("p=%s\n",p);
+		if (!p){
+			TRACE
 			return NULL;
+		}
 		p++;
 		DBGMSG("p=%s\n",p);
 		while((*p==' '))
@@ -299,7 +314,7 @@ char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuest
 		//finally have *p pointing to value of attribName
 		int i=0;
 		char value[bufsize];
-		while((*p!='\0')&&(*p!='\r')&&(*p!='\n')){
+		while((*p!='\0')&&(*p!='\r')&&(*p!='\n')&&(*p!=';')){
 			value[i++]=*p;
 			p++;
 		}
@@ -313,6 +328,38 @@ char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuest
 	return NULL;
 }
 
+
+//make a string "item1" given the number
+char* getItemLabel(int index, char* buffer){
+	strcpy(buffer, "item\0");
+	char itemnumberstr[bufsize];
+	sprintf(itemnumberstr,"%d",index);
+	strcat (buffer,itemnumberstr);
+	return buffer;
+}
+
+
+//items is array of items string
+//itemcount is qty of items
+//cartbody is buffer to hold string result that will be a part of http response body
+char* buildCartBody(char* items, int itemcount, char* cartbody){
+	int i;
+	char countstr[bufsize];
+	char* cstr=countstr;
+	for (i=0; i<=itemcount;i++){
+		char* p = &items[i*MAXITEMLEN];
+		sprintf(cstr,"%d",i);
+		strcat(cartbody,cstr);
+		strcat(cartbody, ". ");
+		strcat(cartbody,p);
+		strcat(cartbody,lineend);
+	}
+	//strcat(cartbody,"\0");
+	return cartbody;
+}
+
+
+
 void handle_client(int socket) {
     
     /* TODO REFACTOR This.
@@ -322,35 +369,36 @@ void handle_client(int socket) {
      * interfaces for sub methods.
      */
 	TRACE
-	//request message - accumulates unitl \r\n\r\n
-	char* msgbuf;
+
 	//request body if any
 	const char *abody;
-	//const char* body;
-	//recv parameter
+
+	//socket recv parameter
 	int flag=0;
 	//request method
 	http_method method;
 	//request path
 	const char* path;
-
-//	char* value;
-	//int len;
-	//int content_length;
-
-
 	// if true will loop waiting for more data
 	int persist_connection=1;
 	// connectionheader value recived
 	char* connection_value;
-
+	//input buffer management
+	//request message - accumulates unitl \r\n\r\n
+	char* msgbuf;
 	unsigned int mbufsize = bufsize;
 	unsigned int *msgbufsize= &mbufsize;
 	msgbuf=(char*) malloc(*msgbufsize);
 	int bytesin=0;
+	//resp structure for control of output
 	resp_setting resp;
-	resp = (resp_setting){ 0,0,0,0};
+
+
+
+	int inContentLen = 0;
+
 	do{
+		resp = (resp_setting){ 0,0,0,0};
 		memset(msgbuf,'\0', *msgbufsize);
 		TRACE
 		DBGMSG("sizeof msgbuf = %d\n", *msgbufsize);
@@ -404,22 +452,22 @@ void handle_client(int socket) {
 
 	/****   get rest of body (if any) **************/
 		//content_length = getContentLength(msgbuf,msgsize);
-		resp.contentlength = getContentLength(msgbuf,msgsize);
-		if (resp.contentlength>0){
+		inContentLen = getContentLength(msgbuf,msgsize);
+		if (inContentLen>0){
 			DBGMSG("content length = %d\n",resp.contentlength);
 			int read = msgsize - sizeofheader;
-			if (sizeleft<resp.contentlength-read){
+			if (sizeleft<inContentLen-read){
 				// incr size should be min of contentlength-read-sizeleft
-				msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, resp.contentlength);
+				msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, inContentLen);
 				sizeleft= *msgbufsize - msgsize -1;
 			}
 			TRACE
 			DBGMSG("read = %d\n",read);
 			DBGMSG("msgsize = %d\n",msgsize);
 
-			while(read<resp.contentlength){
+			while(read<inContentLen){
 				//get the missing body parts
-				DBGMSG("missing %d bytes from body",resp.contentlength-read);
+				DBGMSG("missing %d bytes from body",inContentLen-read);
 				char* appendbuf = msgbuf + msgsize;
 				bytesin = recv(socket, appendbuf, sizeleft, flag);
 				if (bytesin==0){
@@ -464,7 +512,6 @@ void handle_client(int socket) {
 
 		case METHOD_GET:
 			DBGMSG("path=%s\n", path );
-
 			TRACE
 			break;
 		case METHOD_POST:
@@ -507,7 +554,7 @@ void handle_client(int socket) {
 		TRACE
 		//hexprint(path, strlen(path)+2);
 
-		int contlength=0;
+		//int contlength=0;
 		int cmd = command_from_string(path);
 
 		char username[maxcookiesize];
@@ -518,6 +565,10 @@ void handle_client(int socket) {
 		char* body;
 		body = (char*)malloc(bufsize);
 		memset(body,'\0',bufsize);
+		//initialize cartbody that can hold items
+		char* cartbody;
+		cartbody = (char*)malloc(MAXITEMS*MAXITEMLEN);
+		memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
 
 		//initialize usernamebody that will be set by login or cookie
 		// in requests
@@ -527,10 +578,15 @@ void handle_client(int socket) {
 		memset(usernamebody,'\0',bufsize);
 		char * cookieptr = http_parse_header_field(msgbuf, sizeofheader, "Cookie");
 		if (cookieptr&&(strlen(cookieptr)>0)){
-			strcpy (usernamebody,"Username: ");
 			char user[bufsize];
 			usernamevalue = getdecodedCookieAttribute(cookieptr, "username", user);
-			strcat (usernamebody,usernamevalue);
+			if (usernamevalue){
+				TRACE
+				strcpy (usernamebody,"Username: ");
+				strcat (usernamebody,usernamevalue);
+			}else{
+				TRACE
+			}
 		}
 		TRACE
 		if (respindex!=-1){
@@ -539,21 +595,19 @@ void handle_client(int socket) {
 			//create response here and skip cmd processing
 			strcpy (body, http_method_str[method]);
 			strcat (body, " : not implemented");
-			contlength=strlen(body);
+			//contlength=strlen(body);
+			resp.contentlength=strlen(body);
 		}else{
 
 			switch (cmd){
+
 			case CMDLOGIN:  ;  //http://shareprogrammingtips.com/c-language-programming-tips/why-variables-can-not-be-declared-in-a-switch-statement-just-after-labels/
+				;
 				TRACE
 				char* user = getargvalue("username", path, username);
 
 				//DBGMSG("user = %s\n", user);
 				if (user){
-//					char decodeduser[bufsize];
-//					if (strlen(user)>bufsize)
-//							fprintf(stderr,"User Name too long\n");
-//					user = decode(user,decodeduser);
-
 					if ((strlen(cmdresponsefields))!=0){
 						strcat (cmdresponsefields,lineend);
 					}
@@ -601,9 +655,10 @@ void handle_client(int socket) {
 				respindex=2;  //ok
 
 				body = get_localtime(body,bufsize);
-				contlength=strlen(body);
+				//contlength=strlen(body);
+				resp.contentlength+=strlen(body);
 				resp.cache=NOCACHE;
-				DBGMSG("content length = %d\n",contlength);
+				DBGMSG("content length = %d\n",resp.contentlength);
 				break;
 			case CMDBROWSER:
 				TRACE
@@ -615,8 +670,10 @@ void handle_client(int socket) {
 					respindex=6;
 				}
 				TRACE
-				contlength=strlen(body);
-				DBGMSG("content length = %d\n",contlength);
+				//contlength=strlen(body);
+				DBGMSG("contentlength before browser =%d\n",resp.contentlength);
+				resp.contentlength+=strlen(body);
+				DBGMSG("content length = %d\n",resp.contentlength);
 				break;
 			case CMDREDIRECT:
 				TRACE
@@ -642,8 +699,82 @@ void handle_client(int socket) {
 			case CMDPUTFILE:
 				TRACE
 				break;
-			case CMDADDCART:
+			case CMDADDCART: ;
 				TRACE
+				char an_item[MAXITEMLEN];
+
+				char* cartitem = getargvalue("item", path, an_item);
+				TRACE
+				//get username
+				if (usernamevalue&&(strlen(usernamevalue)>0)&&(cartitem)){
+					TRACE
+					if ((strlen(cmdresponsefields))!=0){
+						strcat (cmdresponsefields,lineend);
+					}
+					strcat(cmdresponsefields, default_http_cookie_header);
+					strcat(cmdresponsefields, " username=");
+					char encodedname[bufsize*3+1];
+					strcat(cmdresponsefields, encode(usernamevalue,encodedname));
+					strcat(cmdresponsefields, "; ");
+					DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
+				}
+				TRACE
+				// get the items from cookies
+				//shopping cart structure for handling addcart items
+				char items[MAXITEMS][MAXITEMLEN];
+				memset(items,'\0',MAXITEMS*MAXITEMLEN);
+				int itemcount = 0;
+				char itemlabel[bufsize];
+				char itemstring[bufsize];
+				char* itemlabelptr = getItemLabel(itemcount,itemlabel);
+				char* itemptr = cookieptr;
+				TRACE
+				DBGMSG("itemlabel=%s\n",itemlabelptr);
+				DBGMSG("cookieptr=%s\n",cookieptr);
+
+				while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
+						!=NULL){
+					strcpy(items[itemcount],itemptr);
+					DBGMSG("%d itemptr = %s\n",itemcount,itemptr	);
+					itemcount++;
+					itemlabelptr = getItemLabel(itemcount,itemlabel);
+					DBGMSG("itemlabel=%s\n",itemlabelptr);
+				}
+				// we now have recovered all addcart items from cookies
+				//itemcount is the next blank
+				assert(itemcount<=MAXITEMS);
+
+				if (cartitem){
+					assert (strlen (cartitem)< MAXITEMLEN);
+					strcpy(items[itemcount],cartitem);
+
+					if ((strlen(cmdresponsefields))!=0){
+						strcat (cmdresponsefields,lineend);
+					}
+					itemlabelptr = getItemLabel(itemcount,itemlabel);
+//					char itemlabel[bufsize] = "item\0";
+//					char itemnumberstr[bufsize];
+//					sprintf(itemnumberstr,"%d",itemcount);
+//					strcat (itemlabel,itemnumberstr);
+					if(!usernamevalue)
+						strcat(cmdresponsefields, default_http_cookie_header);
+					strcat(cmdresponsefields," ");
+					strcat(cmdresponsefields,itemlabelptr);
+					strcat(cmdresponsefields, "=");
+					strcat(cmdresponsefields, cartitem);
+					strcat(cmdresponsefields, default_http_cookie_opt);
+
+					cartbody = buildCartBody((char*)items,itemcount, cartbody);
+					resp.contentlength+=strlen(cartbody);
+					itemcount++;
+					respindex=2;
+				}else{
+					// 400 bad request
+					respindex=16;
+					strcpy(usernamebody,"No user name found");
+				}
+				TRACE
+				DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
 
 				break;
 			case CMDDELCART:
@@ -658,15 +789,17 @@ void handle_client(int socket) {
 				respindex=2;
 				resp.connection=CLOSE;
 				strcpy(body, "The connection will now be closed");
-				contlength=strlen(body);
-				DBGMSG("content length = %d\n",contlength);
+				//contlength=strlen(body);
+				resp.contentlength+=strlen(body);
+				DBGMSG("content length = %d\n",resp.contentlength);
 				break;
 			case -1:
 				TRACE
 				respindex=20;
 				sprintf(body,"%s",responsestr[respindex]);
-				contlength=strlen(body);
-				DBGMSG("content length = %d\n",contlength);
+				//contlength=strlen(body);
+				resp.contentlength+=strlen(body);
+				DBGMSG("content length = %d\n",resp.contentlength);
 				break;
 			default:
 				break;
@@ -700,13 +833,14 @@ void handle_client(int socket) {
 
 			// adjust content length: prepend all output with username info if any
 			if (strlen(usernamebody)!=0){
-					contlength += strlen(usernamebody) + strlen(lineend) ;
+					resp.contentlength+=strlen(usernamebody) + strlen(lineend) ;
+					//contlength += strlen(usernamebody) + strlen(lineend) ;
 			}
 
-			if (contlength!=0){
+			if (resp.contentlength!=0){
 				TRACE
 				char contlenstr[bufsize];
-				response = addfield(response, get_http_content_length(contlength,contlenstr),&responsebuffersize);
+				response = addfield(response, get_http_content_length(resp.contentlength,contlenstr),&responsebuffersize);
 			}
 
 			response = addfield(response, "" ,&responsebuffersize);
@@ -717,10 +851,14 @@ void handle_client(int socket) {
 					response = addfield(response, usernamebody, &responsebuffersize);
 			}
 			// response body
-			if (contlength!=0){
+			if (resp.contentlength!=0){
 				response = addfield(response, body,&responsebuffersize);
 				TRACE
 				//hexprint(response,strlen(response));
+			}
+
+			if (strlen(cartbody)!=0){
+				response = addfield(response, cartbody,&responsebuffersize);
 			}
 
 		}else{

@@ -310,7 +310,7 @@ char* doubleBufferSize(char* buffer, unsigned int* msgbufsize){
 	memset (newbuffer,'\0', 2*(*msgbufsize));
 	strncpy(newbuffer, buffer, *msgbufsize);
 	TRACE
-	hexprint (newbuffer, strlen(newbuffer));
+	//hexprint (newbuffer, strlen(newbuffer));
 	free(buffer);
 	buffer=newbuffer;
 	newbuffer=NULL;
