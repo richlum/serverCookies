@@ -2,11 +2,12 @@
  * File: service.c
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+
+#include <string.h>
+
 #include <unistd.h>
 #include <errno.h>
-#include <string.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -14,10 +15,21 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <signal.h>
-#include <time.h>
+
 #include "service.h"
 #include "util.h"
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+// #define _XOPEN_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include "mytime.h"
+
+#include <time.h>
 
 #define bufsize 256
 #define maxcookiesize 4096
@@ -92,12 +104,16 @@ const char* httpver = "HTTP/1.1";
 const char* default_http_connection = "Connection: keep-alive";
 const char* close_http_connection ="Connection: close";
 const char* default_http_contenttype = "Content-Type: text/plain";
+const char* appl_octet_http_contenttype = "Content-Type: application/octet-stream";
 const char* default_http_cache_control = "Cache-Control: public";
 const char* nocache_http_cache_control = "Cache-Control: no-cache";
 const char* lineend = "\r\n";
 const char* default_http_cookie_opt = "; path=/; Max-Age=86400;";
 const char* expirenow_http_cookie_opt = "; path=/; Max-Age=0;";
 const char* default_http_cookie_header = "Set-Cookie: ";
+const char* default_http_charset = "Accept-Charset: IOS-8859-1,utf-8;q=0.7,*;q=0.3;";
+const char* default_http_lang = "Accept-Languate: en-US,en;q=0.8";
+const char* default_http_encoding = "Accept-Encoding:gzip,deflate,sdch";
 const char* timeformatstr ="%a, %d %b %Y %T %Z";
 
 typedef enum  {
@@ -118,6 +134,7 @@ typedef struct resp_setting{
 	connectiontype  connection;
 	cachecontrol	cache;
 	int				contentlength;
+	int				dontmodifybody;
 } resp_setting;
 
 void hexprint(const char* buf, int len){
@@ -421,7 +438,7 @@ void handle_client(int socket) {
 	int inContentLen = 0;
 
 	do{
-		resp = (resp_setting){ 0,0,0,0};
+		resp = (resp_setting){ 0,0,0,0,0};
 
 		memset(msgbuf,'\0', *msgbufsize);
 		TRACE
@@ -736,8 +753,97 @@ void handle_client(int socket) {
 				}
 
 				break;
-			case CMDGETFILE:
+			case CMDGETFILE:  ;
 				TRACE
+				char filename[bufsize];
+				char* pfn = getargvalue("filename", path, filename);
+				DBGMSG("pfn = %s\n",pfn);
+				if (pfn==NULL){
+					TRACE
+					respindex=19;
+					strcpy(body,"No filneame given");
+					resp.contentlength+=strlen(body);
+					break;
+				}
+				char lastmodifileddate[bufsize];
+				char* lstmodfldate = getargvalue("If-Modified-Since",path, lastmodifileddate);
+
+
+				struct stat filestat;
+				//int file = open(pfn, O_RDONLY);
+				if (stat (pfn,&filestat)<0)
+					perror("failed to stat file");
+				resp.contentlength = filestat.st_size;
+
+				DBGMSG ("filesize = %d\n", resp.contentlength);
+				time_t modtime = filestat.st_mtime;
+				struct tm* mtm = gmtime(&modtime);
+				char filetime[bufsize];
+				char* pftime = filetime;
+				strftime(filetime, bufsize, timeformatstr,mtm);
+				DBGMSG("file mod time : %s\n",filetime);
+				int downloadfile=1;
+				//time_t btime;
+				if (lstmodfldate!=NULL){
+
+					struct tm storage;// ={0,0,0,0,0,0,0,0,0};
+					memset (&storage,'\0', sizeof(storage));
+					//char *p=NULL;
+					//p=(char*)strptime(lstmodfldate,timeformatstr,&storage);
+					time_t ftime = to_seconds(pftime, timeformatstr);
+					time_t itime = to_seconds(lstmodfldate, timeformatstr);
+
+					if (itime<ftime){
+					//if (mktime(&storage)<mktime(mtm)){
+						downloadfile=1;
+						//file has been modified since browsers informed time
+					}else{
+						downloadfile=0;
+						respindex = 13;
+						strcpy(body,"Not Modified");
+						resp.contentlength=sizeof(body);
+					}
+				}
+				if (downloadfile==1){
+					if (bufsize < resp.contentlength){
+						free(body);
+						body = (char*)malloc (resp.contentlength + 100);
+					}
+					FILE* fp;
+					fp = fopen(pfn,"r");
+					size_t bytes = fread(body, 1, resp.contentlength, fp);
+					//int bytes = read(file, body, resp.contentlength );
+					fprintf(stderr,"bytes read = %d\n", bytes);
+
+					resp.contentlength=bytes;
+					int fres = fclose(fp);
+
+					fprintf(stderr, "close rc=%d\n", fres);
+				}
+
+
+
+
+
+				TRACE
+				if ((strlen(cmdresponsefields))!=0){
+					strcat (cmdresponsefields,lineend);
+				}
+				strcat(cmdresponsefields, "Content-Location: ");
+				strcat(cmdresponsefields, pfn);
+				strcat(cmdresponsefields, lineend);
+				strcat(cmdresponsefields, "Last-Modified: ");
+				strcat(cmdresponsefields, filetime);
+				//strcat(cmdresponsefields, lineend);
+
+				resp.content=APPL_OCTET;
+				respindex=2;
+				resp.dontmodifybody=1;
+				//strcpy(body,"file transfer: ");
+				//strcpy(body, pfn);
+				//resp.contentlength+=strlen(body);
+				TRACE
+				DBGMSG("size of body = %d\n",strlen(body));
 				break;
 			case CMDPUTFILE:
 				TRACE
@@ -994,7 +1100,15 @@ void handle_client(int socket) {
 				response = addfield(response, close_http_connection,&responsebuffersize);
 			else
 				response = addfield(response, default_http_connection,&responsebuffersize);
-			response = addfield(response, default_http_contenttype,&responsebuffersize);
+
+
+			if (resp.content==APPL_OCTET)
+				response = addfield(response, appl_octet_http_contenttype,&responsebuffersize);
+			else
+				response = addfield(response, default_http_contenttype,&responsebuffersize);
+
+
+
 			if (resp.cache==NOCACHE)
 				response = addfield(response, nocache_http_cache_control,&responsebuffersize);
 			else
@@ -1024,17 +1138,18 @@ void handle_client(int socket) {
 
 			// attach the body now
 			// prepend username before response
-			if (strlen(usernamebody)!=0){
+			if ((strlen(usernamebody)!=0)&&(resp.dontmodifybody!=1)){
 					response = addfield(response, usernamebody, &responsebuffersize);
 			}
 			// response body
 			if ((resp.contentlength!=0)&&(strlen(body)>0)){
 				response = addfield(response, body,&responsebuffersize);
 				TRACE
+				DBGMSG("body size = %d\n", strlen(body));
 				//hexprint(response,strlen(response));
 			}
 			//if a cart exists show itemslist
-			if (strlen(cartbody)!=0){
+			if ((strlen(cartbody)!=0)&&(resp.dontmodifybody!=1)){
 				response = addfield(response, cartbody,&responsebuffersize);
 			}
 

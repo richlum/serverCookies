@@ -22,3 +22,6 @@
 1. mercedes benz
 0. porsche
 1. porsche
+0. phaser
+1. dilithium crystals
+2. romulan ale

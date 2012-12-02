@@ -30,3 +30,9 @@ Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:16.0) Gecko/20100101 Firefox/16.0
 
 localhost:9999/delcart?itemnr=8
 
+
+Username: jameTkirk
+Thank YOU for shopping at WalMart. Please come again
+
+localhost:9999/getfile?filname=CHECKOUT.txt
+
