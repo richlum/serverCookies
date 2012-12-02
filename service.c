@@ -480,6 +480,9 @@ void handle_client(int socket) {
 			fprintf(stderr, "strlen msgbug = %d\n", (int)strlen(msgbuf)	);
 		}
 
+		char* endhdrs = strstr(msgbuf,"\r\n\r\n");
+		DBGMSG("strlen endhdrs = %d\n", strlen(endhdrs));
+		TRACE
 		//hexprint(msgbuf, msgsize+2);
 		DBGMSG("complete message %d\n" , __LINE__);
 		//now have complete first part of message since we have blank line ie \r\n\r\n
@@ -851,9 +854,73 @@ void handle_client(int socket) {
 				break;
 			case CMDPUTFILE:
 				TRACE
+				char * lengthstr = http_parse_header_field(msgbuf, *msgbufsize, "Content-Length");
+				int length = atoi(lengthstr);
+				DBGMSG("contentlength=%d\n",length);
+				DBGMSG("msgbuf='%s'\n",msgbuf	);
+				//TRACE
+				//hexprint(endhdrs,80);
+				//const char *postbody = strstr(msgbuf, "\r\n\r\n");
+				const char* postbody = endhdrs+4;
+				//DBGMSG("postbody=%s\n",postbody)
 
+				if (strncasecmp(postbody,"filename",strlen("filename"))!=0){
+					respindex = 25;
+					strcpy(body,"Missing required filename argument");
+					resp.contentlength=strlen(body);
+					break;
+				}
+				TRACE
+				char* bptr = strchr(postbody,'=');
+				bptr++;
+				hexprint(bptr,40);
+				char uploadfn[bufsize];
+				memset (uploadfn,'\0',bufsize);
+				int i=0;
+				while((*bptr!='&')&&(*bptr!='\r')&&
+						(*bptr!='\n')&&(*bptr!='\0')){
+					uploadfn[i]=*bptr;
+					bptr++;
+					i++;
+				}
+				uploadfn[i]='\0';
+				DBGMSG("filename=%s\n",uploadfn);
+				TRACE
 
+				while(*bptr=='&'){
+					bptr++;
+				}
+				TRACE
+				if (strncasecmp(bptr,"content=",strlen("content="))!=0){
+					respindex = 25;
+					strcpy(body,"Missing required content argument");
+					resp.contentlength=strlen(body);
+					break;
+				}
+				bptr = strchr(bptr,'=');
+				bptr++;
+				TRACE
+				//now pointing at first byte of content, of size 'length'
+				char *decode(const char *original, char *decoded) ;
+				char* decodedcontent = (char*) malloc(length+20);
+				memset(decodedcontent,'\0',length+20);
+				decodedcontent = decode(bptr, decodedcontent);
+				int newsize = strlen(decodedcontent);
 
+				TRACE
+				FILE* fp = fopen(uploadfn,"a");
+				i=0;
+				while((i<newsize)&&(fputc(*decodedcontent, fp))){
+					decodedcontent++;
+					i++;
+				}
+				fclose(fp);
+				strcat (body,"file saved: ");
+				strcat (body, uploadfn);
+				resp.contentlength=strlen(body);
+				respindex=2;
+
+				TRACE
 				break;
 			case CMDADDCART: ;
 				TRACE
@@ -947,7 +1014,7 @@ void handle_client(int socket) {
 				}
 				TRACE
 				// we now have recovered all addcart items from cookies
-				int i;
+				//int i;
 				for (i=0;i<=itemcount-1;i++){
 					DBGMSG("i=%d\n",i);
 					DBGMSG("ITEM='%s'\n",items[i*MAXITEMLEN]);
