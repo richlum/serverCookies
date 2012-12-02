@@ -24,6 +24,7 @@
 #define MAXITEMS 12
 #define MAXITEMLEN 64
 
+
 const char* responsestr[] ={
 		"100 Continue", //0
 		"101 Switching Protocols", //1
@@ -358,10 +359,6 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 	char countstr[bufsize];
 	char* cstr=countstr;
 	TRACE
-	for (i=0;i<itemcount;i++){
-		char *pq = items + (i*MAXITEMLEN);
-		DBGMSG( "%s\n",pq);
-	}
 	for (i=0; i<=itemcount;i++){
 		char* p = &items[i*MAXITEMLEN];
 		DBGMSG("item=%s\n",p);
@@ -769,7 +766,7 @@ void handle_client(int socket) {
 				DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
 
 				break;
-			case CMDDELCART:
+			case CMDDELCART:  ;
 				TRACE
 				char del_item[MAXITEMLEN];
 				char* delete_item = getargvalue("itemnr", path, del_item);
@@ -870,6 +867,74 @@ void handle_client(int socket) {
 				break;
 			case CMDCHECKOUT:
 				TRACE
+				if ((usernamevalue)&&(strlen(usernamevalue)>0)){
+					if ((strlen(cmdresponsefields))!=0){
+						strcat (cmdresponsefields,lineend);
+					}
+
+
+					memset(items,'\0',MAXITEMS*MAXITEMLEN);
+					itemcount = 0;
+					memset(itemstring,'\0',bufsize);
+					itemlabelptr = getItemLabel(itemcount,itemlabel);
+					itemptr = cookieptr;
+					TRACE
+
+					while(itemptr!=NULL){
+						itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring);
+						TRACE
+						if (itemptr!=NULL){
+							DBGMSG("%d  itemptr=%s\n",itemcount,itemptr);
+							strcpy(items[itemcount*MAXITEMLEN],itemptr);
+							TRACE
+							itemcount++;
+							itemlabelptr = getItemLabel(itemcount,itemlabel);
+						}else{
+							TRACE
+							break;
+						}
+
+					}
+					TRACE
+					// items contains array of item strings.
+					FILE* fp = fopen("CHECKOUT.txt","a");
+					if (fp==NULL){
+						perror("failed to open file");
+					}
+					char tempstr[maxcookiesize];
+					for(i=0;i<itemcount;i++){
+						sprintf(tempstr,"%d. ",i);
+						strcat(tempstr, items[i*MAXITEMLEN] );
+						strcat(tempstr, lineend);
+						fprintf(fp, "%s", tempstr);
+
+					}
+					int res = fclose(fp);
+					if (res!=0){
+						perror("failed to clos file");
+					}
+					TRACE
+					for (i=0;i<itemcount;i++){
+						itemlabelptr = getItemLabel(i,itemlabel);
+						strcat(cmdresponsefields, default_http_cookie_header);
+						strcat(cmdresponsefields,itemlabelptr);
+						strcat(cmdresponsefields, "=");
+						strcat(cmdresponsefields, items[i*MAXITEMLEN]);
+						strcat(cmdresponsefields, expirenow_http_cookie_opt);
+						if (i<itemcount-1)
+							strcat(cmdresponsefields, lineend);
+					}
+					DBGMSG("cmdresponsefiles='%s'\n",cmdresponsefields);
+					strcat(body, "Thank YOU for shopping at WalMart. Please come again");
+					resp.contentlength+=strlen(body);
+					respindex=2;
+				}else{
+					TRACE
+					respindex=19;
+					strcpy(body,"User must be logged in to checkout");
+					resp.contentlength+=strlen(body);
+				}
+
 				break;
 			case CMDCLOSE:
 				TRACE
