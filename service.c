@@ -423,7 +423,6 @@ void handle_client(int socket) {
 			TRACE
 			sizeleft = *msgbufsize - msgsize-1;
 			fprintf(stderr, "sizeleft = %d\n", sizeleft);
-			//hexprint(msgbuf, msgsize+2);
 			while (sizeleft<bytesin){
 				msgbuf=doubleBufferSize(msgbuf, msgbufsize);
 				sizeleft= *msgbufsize - msgsize - 1;
@@ -496,7 +495,6 @@ void handle_client(int socket) {
 			//either http/1.0 or request for not persistent
 			fprintf(stderr, "connection: %s\n", connection_value);
 			fprintf(stderr,"Will NOT persist connection\n");
-			//todo: should send "Connection: close"   (8.1.2.1)
 			persist_connection=0;
 		}else {
 			fprintf(stderr,"persisting connection\n");
@@ -600,7 +598,6 @@ void handle_client(int socket) {
 			//create response here and skip cmd processing
 			strcpy (body, http_method_str[method]);
 			strcat (body, " : not implemented");
-			//contlength=strlen(body);
 			resp.contentlength=strlen(body);
 		}else{
 
@@ -611,7 +608,6 @@ void handle_client(int socket) {
 				TRACE
 				char* user = getargvalue("username", path, username);
 
-				//DBGMSG("user = %s\n", user);
 				if (user){
 					if ((strlen(cmdresponsefields))!=0){
 						strcat (cmdresponsefields,lineend);
@@ -625,11 +621,9 @@ void handle_client(int socket) {
 					strcpy(usernamebody,"Username: ");
 					strcat(usernamebody,user);
 					//strcat(usernamebody,lineend);
-					DBGMSG(" usernamebody = %s\n", usernamebody);
 				}else{
 					// 400 bad request
 					respindex=16;
-					strcpy(usernamebody,"No user name found");
 				}
 				break;
 			case CMDLOGOUT:
@@ -676,16 +670,13 @@ void handle_client(int socket) {
 				}
 				TRACE
 				//contlength=strlen(body);
-				DBGMSG("contentlength before browser =%d\n",resp.contentlength);
 				resp.contentlength+=strlen(body);
-				DBGMSG("content length = %d\n",resp.contentlength);
 				break;
 			case CMDREDIRECT:
 				TRACE
 				respindex=12;
 				char* location = getargvalue("url", path, username);
 
-				//DBGMSG("user = %s\n", user);
 				if (location){
 					char* decodedlocation = (char*)malloc(strlen(location));
 					decodedlocation = decode(location,decodedlocation);
@@ -705,27 +696,9 @@ void handle_client(int socket) {
 				TRACE
 				break;
 			case CMDADDCART: ;
+				TRACE
 				char an_item[MAXITEMLEN];
-				TRACE
-				DBGMSG("username=%s\n",usernamevalue);
 				char* cartitem = getargvalue("item", path, an_item);
-				DBGMSG("username=%s\n",usernamevalue);
-				TRACE
-				//get username
-				DBGMSG("username=%s\n",usernamevalue);
-//				if (usernamevalue&&(strlen(usernamevalue)>0)&&(cartitem)){
-//					TRACE
-//					if ((strlen(cmdresponsefields))!=0){
-//						strcat (cmdresponsefields,lineend);
-//					}
-//					strcat(cmdresponsefields, default_http_cookie_header);
-//					strcat(cmdresponsefields, "username=");
-//					char encodedname[bufsize*3+1];
-//					strcat(cmdresponsefields, encode(usernamevalue,encodedname));
-//					strcat(cmdresponsefields, ";");
-//					DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
-//				}
-				TRACE
 				// get the items from cookies
 				//shopping cart structure for handling addcart items
 				char items[MAXITEMS][MAXITEMLEN];
@@ -736,16 +709,12 @@ void handle_client(int socket) {
 				char* itemlabelptr = getItemLabel(itemcount,itemlabel);
 				char* itemptr = cookieptr;
 				TRACE
-				DBGMSG("itemlabel=%s\n",itemlabelptr);
-				DBGMSG("cookieptr=%s\n",cookieptr);
 
 				while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
 						!=NULL){
 					strcpy(items[itemcount],itemptr);
-					DBGMSG("%d itemptr = %s\n",itemcount,itemptr	);
 					itemcount++;
 					itemlabelptr = getItemLabel(itemcount,itemlabel);
-					DBGMSG("itemlabel=%s\n",itemlabelptr);
 				}
 				// we now have recovered all addcart items from cookies
 				//itemcount is the next blank
@@ -755,16 +724,8 @@ void handle_client(int socket) {
 					assert (strlen (cartitem)< MAXITEMLEN);
 					strcpy(items[itemcount],cartitem);
 
-//					if ((strlen(cmdresponsefields))!=0){
-//						strcat (cmdresponsefields,lineend);
-//					}
 					itemlabelptr = getItemLabel(itemcount,itemlabel);
-//					char itemlabel[bufsize] = "item\0";
-//					char itemnumberstr[bufsize];
-//					sprintf(itemnumberstr,"%d",itemcount);
-//					strcat (itemlabel,itemnumberstr);
-					//if(!usernamevalue)
-						strcat(cmdresponsefields, default_http_cookie_header);
+					strcat(cmdresponsefields, default_http_cookie_header);
 					strcat(cmdresponsefields," ");
 					strcat(cmdresponsefields,itemlabelptr);
 					strcat(cmdresponsefields, "=");
@@ -860,17 +821,14 @@ void handle_client(int socket) {
 			if (strlen(usernamebody)!=0){
 					response = addfield(response, usernamebody, &responsebuffersize);
 			}
-			DBGMSG("response=$'%s'\n",response);
 			// response body
 			if ((resp.contentlength!=0)&&(strlen(body)>0)){
 				response = addfield(response, body,&responsebuffersize);
 				TRACE
 				//hexprint(response,strlen(response));
 			}
-			DBGMSG("response=$'%s'\n",response);
 			//if a cart exists show itemslist
 			if (strlen(cartbody)!=0){
-				DBGMSG("cartbody$:'%s'",cartbody);
 				response = addfield(response, cartbody,&responsebuffersize);
 			}
 
@@ -881,7 +839,7 @@ void handle_client(int socket) {
 			//above already
 		}
 
-		DBGMSG("RESPONSE: $%s", response);
+		fprintf(stderr,"RESPONSE: $%s", response);
 
 	/*********  send response *******************************/
 		TRACE
@@ -920,8 +878,6 @@ void handle_client(int socket) {
 		}
 		TRACE
 	} while( bytesin >0);
-
-
-
+	fprintf(stderr,"child exiting\n");
 
 }
