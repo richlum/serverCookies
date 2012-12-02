@@ -837,7 +837,7 @@ void handle_client(int socket) {
 						//all these elements have to shift down one
 						itemlabelptr = getItemLabel(i,itemlabel);
 						strcat(cmdresponsefields, default_http_cookie_header);
-						strcat(cmdresponsefields," ");
+						//strcat(cmdresponsefields," ");
 						strcat(cmdresponsefields,itemlabelptr);
 						strcat(cmdresponsefields, "=");
 						strcat(cmdresponsefields, items[(i+1)*MAXITEMLEN]);
@@ -857,6 +857,8 @@ void handle_client(int socket) {
 					strcat(cartbody, items[i*MAXITEMLEN]);
 					strcat(cartbody, lineend);
 				}
+				if (itemcount<=1)
+					strcpy(cartbody," EMPTY CART");
 				TRACE
 				DBGMSG("delcart cmdresponse = '%s'\n",cmdresponsefields);
 				DBGMSG("cartbody = '%s'\n",cartbody);
