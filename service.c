@@ -290,8 +290,8 @@ char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuest
 	DBGMSG("p=%s\n",p);
 	DBGMSG("*p=%x %c\n",*p, *p);
 	DBGMSG("attribName (%d) = %s\n", strlen(attribName), attribName);
-	int rc = strncasecmp(p,attribName,strlen(attribName));
-	DBGMSG("strncasecmp result = %d\n",rc );
+//	int rc = strncasecmp(p,attribName,strlen(attribName));
+//	DBGMSG("strncasecmp result = %d\n",rc );
 	while((*p!='\0')&&(*p!='\r')&&(*p!='\n')
 			&&(strncasecmp(p,attribName,strlen(attribName))!=0)){
 		p=strchr(p,';');
@@ -841,7 +841,7 @@ void handle_client(int socket) {
 			// adjust content length: prepend all output with username info if any
 			if (strlen(usernamebody)!=0){
 					resp.contentlength+=strlen(usernamebody) + strlen(lineend) ;
-					//contlength += strlen(usernamebody) + strlen(lineend) ;
+					//contlength += strlen() + strlen(lineend) ;
 			}
 
 			if (resp.contentlength!=0){
@@ -857,14 +857,17 @@ void handle_client(int socket) {
 			if (strlen(usernamebody)!=0){
 					response = addfield(response, usernamebody, &responsebuffersize);
 			}
+			DBGMSG("response=$'%s'\n",response);
 			// response body
-			if (resp.contentlength!=0){
+			if ((resp.contentlength!=0)&&(strlen(body)>0)){
 				response = addfield(response, body,&responsebuffersize);
 				TRACE
 				//hexprint(response,strlen(response));
 			}
-
+			DBGMSG("response=$'%s'\n",response);
+			//if a cart exists show itemslist
 			if (strlen(cartbody)!=0){
+				DBGMSG("cartbody$:'%s'",cartbody);
 				response = addfield(response, cartbody,&responsebuffersize);
 			}
 
