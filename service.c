@@ -259,7 +259,8 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		TRACE
 		DBGMSG("%d, value=%s\n", strlen(value), value);
 
-		char* decodedvalue = (char*)malloc (strlen(value));
+		char* decodedvalue = (char*)malloc (strlen(value)*2);
+		memset(decodedvalue,'\0',strlen(value)*2);
 		decodedvalue = decode(value,decodedvalue);
 		strcpy (value, decodedvalue);
 		free(decodedvalue);
@@ -399,6 +400,7 @@ void handle_client(int socket) {
 
 	do{
 		resp = (resp_setting){ 0,0,0,0};
+
 		memset(msgbuf,'\0', *msgbufsize);
 		TRACE
 		DBGMSG("sizeof msgbuf = %d\n", *msgbufsize);
@@ -574,23 +576,26 @@ void handle_client(int socket) {
 		// in requests
 		char* usernamevalue=NULL;
 		char* usernamebody;
+		char user[bufsize];
 		usernamebody = (char*)malloc(bufsize);
 		memset(usernamebody,'\0',bufsize);
 		char * cookieptr = http_parse_header_field(msgbuf, sizeofheader, "Cookie");
 		if (cookieptr&&(strlen(cookieptr)>0)){
-			char user[bufsize];
 			usernamevalue = getdecodedCookieAttribute(cookieptr, "username", user);
 			if (usernamevalue){
 				TRACE
 				strcpy (usernamebody,"Username: ");
 				strcat (usernamebody,usernamevalue);
+				DBGMSG("usernamebody=%s\n",usernamebody);
 			}else{
 				TRACE
+				DBGMSG("username=%s\n",usernamevalue);
 			}
 		}
 		TRACE
 		if (respindex!=-1){
 			TRACE
+			DBGMSG("username=%s\n",usernamevalue);
 			//already encountered error condition from method
 			//create response here and skip cmd processing
 			strcpy (body, http_method_str[method]);
@@ -600,7 +605,7 @@ void handle_client(int socket) {
 		}else{
 
 			switch (cmd){
-
+			DBGMSG("username=%s\n",usernamevalue);
 			case CMDLOGIN:  ;  //http://shareprogrammingtips.com/c-language-programming-tips/why-variables-can-not-be-declared-in-a-switch-statement-just-after-labels/
 				;
 				TRACE
@@ -612,7 +617,7 @@ void handle_client(int socket) {
 						strcat (cmdresponsefields,lineend);
 					}
 					strcat(cmdresponsefields, default_http_cookie_header);
-					strcat(cmdresponsefields, " username=");
+					strcat(cmdresponsefields, "username=");
 					strcat(cmdresponsefields, user);
 					strcat(cmdresponsefields, default_http_cookie_opt);
 
@@ -634,7 +639,7 @@ void handle_client(int socket) {
 						strcat (cmdresponsefields,lineend);
 					}
 					strcat(cmdresponsefields, default_http_cookie_header);
-					strcat(cmdresponsefields, " username=");
+					strcat(cmdresponsefields, "username=");
 					char encodedname[bufsize*3+1];
 					strcat(cmdresponsefields, encode(usernamevalue,encodedname));
 					strcat(cmdresponsefields, expirenow_http_cookie_opt);
@@ -700,24 +705,26 @@ void handle_client(int socket) {
 				TRACE
 				break;
 			case CMDADDCART: ;
-				TRACE
 				char an_item[MAXITEMLEN];
-
+				TRACE
+				DBGMSG("username=%s\n",usernamevalue);
 				char* cartitem = getargvalue("item", path, an_item);
+				DBGMSG("username=%s\n",usernamevalue);
 				TRACE
 				//get username
-				if (usernamevalue&&(strlen(usernamevalue)>0)&&(cartitem)){
-					TRACE
-					if ((strlen(cmdresponsefields))!=0){
-						strcat (cmdresponsefields,lineend);
-					}
-					strcat(cmdresponsefields, default_http_cookie_header);
-					strcat(cmdresponsefields, " username=");
-					char encodedname[bufsize*3+1];
-					strcat(cmdresponsefields, encode(usernamevalue,encodedname));
-					strcat(cmdresponsefields, "; ");
-					DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
-				}
+				DBGMSG("username=%s\n",usernamevalue);
+//				if (usernamevalue&&(strlen(usernamevalue)>0)&&(cartitem)){
+//					TRACE
+//					if ((strlen(cmdresponsefields))!=0){
+//						strcat (cmdresponsefields,lineend);
+//					}
+//					strcat(cmdresponsefields, default_http_cookie_header);
+//					strcat(cmdresponsefields, "username=");
+//					char encodedname[bufsize*3+1];
+//					strcat(cmdresponsefields, encode(usernamevalue,encodedname));
+//					strcat(cmdresponsefields, ";");
+//					DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
+//				}
 				TRACE
 				// get the items from cookies
 				//shopping cart structure for handling addcart items
@@ -748,15 +755,15 @@ void handle_client(int socket) {
 					assert (strlen (cartitem)< MAXITEMLEN);
 					strcpy(items[itemcount],cartitem);
 
-					if ((strlen(cmdresponsefields))!=0){
-						strcat (cmdresponsefields,lineend);
-					}
+//					if ((strlen(cmdresponsefields))!=0){
+//						strcat (cmdresponsefields,lineend);
+//					}
 					itemlabelptr = getItemLabel(itemcount,itemlabel);
 //					char itemlabel[bufsize] = "item\0";
 //					char itemnumberstr[bufsize];
 //					sprintf(itemnumberstr,"%d",itemcount);
 //					strcat (itemlabel,itemnumberstr);
-					if(!usernamevalue)
+					//if(!usernamevalue)
 						strcat(cmdresponsefields, default_http_cookie_header);
 					strcat(cmdresponsefields," ");
 					strcat(cmdresponsefields,itemlabelptr);
