@@ -19,3 +19,14 @@ GET http://lulu.ugrad.cs.ubc.ca:8080/login?username=rlum HTTP/1.1
 
 GET http://localhost:9999/login?username=rlum HTTP/1.1
 GET http://lulu.ugrad.cs.ubc.ca:9999/login?username=rlum HTTP/1.1
+
+Set-Cookie: path=/; Max-Age=86400; username=rlum
+
+
+CONNECT http://lulu.ugrad.cs.ubc.ca:9999/login?username=rlum HTTP/1.1
+
+
+Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:16.0) Gecko/20100101 Firefox/16.0
+
+localhost:9999/delcart?itemnr=8
+

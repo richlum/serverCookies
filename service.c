@@ -232,19 +232,26 @@ char* get_http_content_length(int contlength,char* contlenstr){
 // extract the argument that has the given name
 char* getargvalue(const char* argname, const char* path, char* value){
 	TRACE
+
 	char* p = strchr(path, '?');
 	p++;
 	DBGMSG("p=%s\n", p);
 	DBGMSG("argname=%s\n",argname);
 	int match;
-	while(((match=(!strncasecmp(p,argname,strlen(argname))))==0)&&(p)){
+	while((p)&&((match=(!strncasecmp(p,argname,strlen(argname))))==0)){
 		p=strchr(p,'&');
 		if (p)
 			p++;
 		TRACE
-		DBGMSG("p=%s\n", p);
+//		DBGMSG("p=%s\n", p);
 	}
-	if ((match)&&p){
+	TRACE
+	if(p==NULL){
+		TRACE
+		return NULL;
+	}
+	TRACE
+	if ((match)&&(p!=NULL)){
 
 		int i=0;
 		p=strchr(p,'=');
@@ -269,46 +276,49 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		DBGMSG("%d, value=%s\n", strlen(value), value);
 		return value;
 	}
+	TRACE
 	return NULL;
 }
 
 
 char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuestore){
 	TRACE
-	DBGMSG("searching for (%d) attribute =%s\n", strlen(attribName),attribName);
+	DBGMSG("searching for (%d) attribute='%s'\n", strlen(attribName),attribName);
 	char* p = cookieptr;
 	char* result;
 	// expecting ptr to first attribute name or blanks preceding it.
-	TRACE
-	if (p==NULL)
+	//TRACE
+	if (p==NULL){
+		//TRACE
 		return NULL;
-	DBGMSG("p=%s\n",p);
+	}
+	//DBGMSG("p=%s\n",p);
 	while (*p==' '){
 		p++;
 	}
-	TRACE
-	DBGMSG("p=%s\n",p);
-	DBGMSG("*p=%x %c\n",*p, *p);
-	DBGMSG("attribName (%d) = %s\n", strlen(attribName), attribName);
+	//TRACE
+	//DBGMSG("p=%s\n",p);
+	//DBGMSG("*p=%x %c\n",*p, *p);
+	//DBGMSG("attribName (%d) = %s\n", strlen(attribName), attribName);
 //	int rc = strncasecmp(p,attribName,strlen(attribName));
 //	DBGMSG("strncasecmp result = %d\n",rc );
 	while((*p!='\0')&&(*p!='\r')&&(*p!='\n')
 			&&(strncasecmp(p,attribName,strlen(attribName))!=0)){
 		p=strchr(p,';');
-		TRACE
-		DBGMSG("p=%s\n",p);
+		//TRACE
+		//DBGMSG("p=%s\n",p);
 		if (!p){
 			TRACE
 			return NULL;
 		}
 		p++;
-		DBGMSG("p=%s\n",p);
+		//DBGMSG("p=%s\n",p);
 		while((*p==' '))
 			p++;
 	}
 	//have ptr to attribute name
-	TRACE
-	DBGMSG("p=%s\n",p);
+	//TRACE
+	//DBGMSG("p=%s\n",p);
 	if ((*p!='\0')&&(*p!='\r')&&(*p!='\n')){
 		p=strchr(p,'=');
 		p++;
@@ -551,7 +561,6 @@ void handle_client(int socket) {
 
 		TRACE
 	/********** process cmd to  build response ******************************/
-		TRACE
 		//hexprint(path, strlen(path)+2);
 
 		//int contlength=0;
@@ -559,7 +568,7 @@ void handle_client(int socket) {
 
 		char username[maxcookiesize];
 		// init http response fields to be added
-		char cmdresponsefields[bufsize];
+		char cmdresponsefields[maxcookiesize];
 		memset (cmdresponsefields,'\0',bufsize);
 		//initialize body of response
 		char* body;
@@ -569,6 +578,13 @@ void handle_client(int socket) {
 		char* cartbody;
 		cartbody = (char*)malloc(MAXITEMS*MAXITEMLEN);
 		memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
+		//array of cart items
+		char items[MAXITEMS][MAXITEMLEN];
+		int itemcount;
+		char itemlabel[bufsize];
+		char itemstring[bufsize];
+		char* itemlabelptr;
+		char* itemptr;
 
 		//initialize usernamebody that will be set by login or cookie
 		// in requests
@@ -577,8 +593,10 @@ void handle_client(int socket) {
 		char user[bufsize];
 		usernamebody = (char*)malloc(bufsize);
 		memset(usernamebody,'\0',bufsize);
+		TRACE
 		char * cookieptr = http_parse_header_field(msgbuf, sizeofheader, "Cookie");
 		if (cookieptr&&(strlen(cookieptr)>0)){
+			TRACE
 			usernamevalue = getdecodedCookieAttribute(cookieptr, "username", user);
 			if (usernamevalue){
 				TRACE
@@ -701,13 +719,12 @@ void handle_client(int socket) {
 				char* cartitem = getargvalue("item", path, an_item);
 				// get the items from cookies
 				//shopping cart structure for handling addcart items
-				char items[MAXITEMS][MAXITEMLEN];
+
 				memset(items,'\0',MAXITEMS*MAXITEMLEN);
-				int itemcount = 0;
-				char itemlabel[bufsize];
-				char itemstring[bufsize];
-				char* itemlabelptr = getItemLabel(itemcount,itemlabel);
-				char* itemptr = cookieptr;
+				itemcount = 0;
+				memset(itemstring,'\0',bufsize);
+				itemlabelptr = getItemLabel(itemcount,itemlabel);
+				itemptr = cookieptr;
 				TRACE
 
 				while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
@@ -747,7 +764,81 @@ void handle_client(int socket) {
 				break;
 			case CMDDELCART:
 				TRACE
+				char del_item[MAXITEMLEN];
+				char* delete_item = getargvalue("itemnr", path, del_item);
+				TRACE
+				DBGMSG("del item = %s\n",delete_item);
+				if (delete_item==NULL){
+					TRACE
+					respindex=16;
+					strcpy(usernamebody,"No itemnr found");
+					break;
+				}
+				//delete_item+=strlen("item");
+				int itemnumber = atoi(delete_item);
+				if ((itemnumber<0)||(itemnumber>MAXITEMS)){
+					fprintf(stderr, "itemnumber (%d) out of range",itemnumber);
+				}
+				DBGMSG("itemnumber to delete=%d\n",itemnumber);
+				// get the items from cookies
+				//shopping cart structure for handling addcart items
 
+				memset(items,'\0',MAXITEMS*MAXITEMLEN);
+				itemcount = 0;
+				memset(itemstring,'\0',bufsize);
+				itemlabelptr = getItemLabel(itemcount,itemlabel);
+				itemptr = cookieptr;
+				TRACE
+
+				while(itemptr!=NULL){
+					itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring);
+					if (itemptr!=NULL){
+						strcpy(items[itemcount*MAXITEMLEN],itemptr);
+						itemcount++;
+						itemlabelptr = getItemLabel(itemcount,itemlabel);
+					}
+				}
+				TRACE
+				// we now have recovered all addcart items from cookies
+				int i;
+				for (i=0;i<=itemcount-1;i++){
+					DBGMSG("i=%d\n",i);
+					DBGMSG("ITEM='%s'\n",items[i*MAXITEMLEN]);
+					if (i<itemnumber){
+						//do nothing
+						TRACE
+					}else if (i==itemcount-1){
+						//delete this one
+						TRACE
+						itemlabelptr = getItemLabel(i,itemlabel);
+						strcat(cmdresponsefields, default_http_cookie_header);
+						strcat(cmdresponsefields," ");
+						strcat(cmdresponsefields,itemlabelptr);
+						strcat(cmdresponsefields, "=");
+						strcat(cmdresponsefields, items[i*MAXITEMLEN]);
+						strcat(cmdresponsefields, expirenow_http_cookie_opt);
+						//items[itemcount]=NULL;
+						DBGMSG("final del (%d) cmdresponsefields='%s'\n",i,cmdresponsefields);
+					}else{
+						TRACE
+						//all these elements have to shift down one
+						itemlabelptr = getItemLabel(i,itemlabel);
+						strcat(cmdresponsefields, default_http_cookie_header);
+						strcat(cmdresponsefields," ");
+						strcat(cmdresponsefields,itemlabelptr);
+						strcat(cmdresponsefields, "=");
+						strcat(cmdresponsefields, items[(i+1)*MAXITEMLEN]);
+						strcat(cmdresponsefields, default_http_cookie_opt);
+						strcat(cmdresponsefields, lineend);
+					//	strcpy(items[i*MAXITEMLEN],items[(i+1)*MAXITEMLEN]);
+					}
+				}
+				TRACE
+				DBGMSG("delcart cmdresponse = '%s'\n",cmdresponsefields);
+				cartbody = buildCartBody((char*)items,itemcount-1, cartbody);
+				resp.contentlength+=strlen(cartbody);
+				itemcount--;
+				respindex=2;
 
 
 				break;
