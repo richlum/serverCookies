@@ -812,21 +812,21 @@ void handle_client(int socket) {
 						free(body);
 						body = (char*)malloc (resp.contentlength + 100);
 					}
+//					strcat(body, "filename=download.txt&content=");
+					char* bptr =body;// + strlen("filename=download.txt&content=");
 					FILE* fp;
 					fp = fopen(pfn,"r");
-					size_t bytes = fread(body, 1, resp.contentlength, fp);
+					size_t bytes = fread(bptr, 1, resp.contentlength, fp);
 					//int bytes = read(file, body, resp.contentlength );
 					fprintf(stderr,"bytes read = %d\n", bytes);
 
+					//resp.contentlength=strlen(body);
 					resp.contentlength=bytes;
+					DBGMSG("bodysize = %d\n",resp.contentlength);
 					int fres = fclose(fp);
 
 					fprintf(stderr, "close rc=%d\n", fres);
 				}
-
-
-
-
 
 				TRACE
 				if ((strlen(cmdresponsefields))!=0){
@@ -847,9 +847,13 @@ void handle_client(int socket) {
 				//resp.contentlength+=strlen(body);
 				TRACE
 				DBGMSG("size of body = %d\n",strlen(body));
+				DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 				break;
 			case CMDPUTFILE:
 				TRACE
+
+
+
 				break;
 			case CMDADDCART: ;
 				TRACE
@@ -1095,6 +1099,7 @@ void handle_client(int socket) {
 		}
 /**************** assemble response *******************/
 		TRACE
+		DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 		char* response;
 		if (respindex>0){
 			response = (char*)malloc(bufsize);
@@ -1106,7 +1111,7 @@ void handle_client(int socket) {
 			else
 				response = addfield(response, default_http_connection,&responsebuffersize);
 
-
+			DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 			if (resp.content==APPL_OCTET)
 				response = addfield(response, appl_octet_http_contenttype,&responsebuffersize);
 			else
@@ -1126,13 +1131,13 @@ void handle_client(int socket) {
 				TRACE
 				response = addfield(response, cmdresponsefields,&responsebuffersize);
 			}
-
+			DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 			// adjust content length: prepend all output with username info if any
-			if (strlen(usernamebody)!=0){
+			if ((strlen(usernamebody)!=0)&&(resp.dontmodifybody!=1)){
 					resp.contentlength+=strlen(usernamebody) + strlen(lineend) ;
 					//contlength += strlen() + strlen(lineend) ;
 			}
-
+			DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 			if (resp.contentlength!=0){
 				TRACE
 				char contlenstr[bufsize];
