@@ -289,7 +289,7 @@ char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuest
 	// expecting ptr to first attribute name or blanks preceding it.
 	//TRACE
 	if (p==NULL){
-		//TRACE
+		TRACE
 		return NULL;
 	}
 	//DBGMSG("p=%s\n",p);
@@ -357,13 +357,20 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 	int i;
 	char countstr[bufsize];
 	char* cstr=countstr;
+	TRACE
+	for (i=0;i<itemcount;i++){
+		char *pq = items + (i*MAXITEMLEN);
+		DBGMSG( "%s\n",pq);
+	}
 	for (i=0; i<=itemcount;i++){
 		char* p = &items[i*MAXITEMLEN];
+		DBGMSG("item=%s\n",p);
 		sprintf(cstr,"%d",i);
 		strcat(cartbody,cstr);
 		strcat(cartbody, ". ");
 		strcat(cartbody,p);
 		strcat(cartbody,lineend);
+		//DBGMSG("%d  %s\n",i,cartbody);
 	}
 	//strcat(cartbody,"\0");
 	return cartbody;
@@ -792,11 +799,17 @@ void handle_client(int socket) {
 
 				while(itemptr!=NULL){
 					itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring);
+					TRACE
 					if (itemptr!=NULL){
+						DBGMSG("%d  itemptr=%s\n",itemcount,itemptr);
 						strcpy(items[itemcount*MAXITEMLEN],itemptr);
+						TRACE
 						itemcount++;
 						itemlabelptr = getItemLabel(itemcount,itemlabel);
+					}else{
+						break;
 					}
+
 				}
 				TRACE
 				// we now have recovered all addcart items from cookies
@@ -830,12 +843,23 @@ void handle_client(int socket) {
 						strcat(cmdresponsefields, items[(i+1)*MAXITEMLEN]);
 						strcat(cmdresponsefields, default_http_cookie_opt);
 						strcat(cmdresponsefields, lineend);
-					//	strcpy(items[i*MAXITEMLEN],items[(i+1)*MAXITEMLEN]);
+						strncpy(items[i*MAXITEMLEN],items[(i+1)*MAXITEMLEN],MAXITEMLEN);
 					}
 				}
 				TRACE
+				memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
+				char tempstr[bufsize];
+				memset(tempstr,'\0',bufsize);
+				for (i=0;i<itemcount-1;i++){
+					fprintf(stderr, "%s\n",items[i*MAXITEMLEN]);
+					sprintf(tempstr,"%d. ",i);
+					strcat(cartbody, tempstr);
+					strcat(cartbody, items[i*MAXITEMLEN]);
+					strcat(cartbody, lineend);
+				}
+				TRACE
 				DBGMSG("delcart cmdresponse = '%s'\n",cmdresponsefields);
-				cartbody = buildCartBody((char*)items,itemcount-1, cartbody);
+				DBGMSG("cartbody = '%s'\n",cartbody);
 				resp.contentlength+=strlen(cartbody);
 				itemcount--;
 				respindex=2;
