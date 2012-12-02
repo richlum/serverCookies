@@ -785,6 +785,7 @@ void handle_client(int socket) {
 				int downloadfile=1;
 				//time_t btime;
 				if (lstmodfldate!=NULL){
+					DBGMSG("lstmodfldate = %s\n",lstmodfldate);
 
 					struct tm storage;// ={0,0,0,0,0,0,0,0,0};
 					memset (&storage,'\0', sizeof(storage));
@@ -796,8 +797,10 @@ void handle_client(int socket) {
 					if (itime<ftime){
 					//if (mktime(&storage)<mktime(mtm)){
 						downloadfile=1;
+						TRACE
 						//file has been modified since browsers informed time
 					}else{
+						TRACE
 						downloadfile=0;
 						respindex = 13;
 						strcpy(body,"Not Modified");
@@ -1031,6 +1034,8 @@ void handle_client(int socket) {
 					if (fp==NULL){
 						perror("failed to open file");
 					}
+					//username
+					fprintf(fp, "%s\r\n", usernamebody);
 					char tempstr[maxcookiesize];
 					for(i=0;i<itemcount;i++){
 						sprintf(tempstr,"%d. ",i);
