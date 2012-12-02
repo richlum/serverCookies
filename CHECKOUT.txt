@@ -1,3 +1,6 @@
 Username: scotty
 0. phaser
 1. cpsc320 textbook
+Username: scotty
+0. phaser
+1. spacesuit

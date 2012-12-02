@@ -852,7 +852,7 @@ void handle_client(int socket) {
 				DBGMSG("size of body = %d\n",strlen(body));
 				DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 				break;
-			case CMDPUTFILE:
+			case CMDPUTFILE: ;
 				TRACE
 				char * lengthstr = http_parse_header_field(msgbuf, *msgbufsize, "Content-Length");
 				int length = atoi(lengthstr);
@@ -906,6 +906,13 @@ void handle_client(int socket) {
 				memset(decodedcontent,'\0',length+20);
 				decodedcontent = decode(bptr, decodedcontent);
 				int newsize = strlen(decodedcontent);
+
+//				if (access(uploadfn, W_OK)!=0){
+//					respindex = 19;
+//					strcpy(body,"Insufficient access privilige");
+//					resp.contentlength=strlen(body);
+//					break;
+//				}
 
 				TRACE
 				FILE* fp = fopen(uploadfn,"a");
