@@ -786,6 +786,9 @@ void handle_client(int socket) {
 				break;
 			case CMDDELCART:
 				TRACE
+
+
+
 				break;
 			case CMDCHECKOUT:
 				TRACE
