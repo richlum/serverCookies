@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Assignment 4 Test Form</title>
+        <style>
+            body{ font-family: Arial, Helvectica, sans-serif; }
+        </style>
+    </head>
+    <body>
+        <h1>Assignment 4 Test Form</h1>
+        <p>
+            You can use the form below to test the POST endpoints of your <b>putfile</b> command.
+        </p>
+        <p>
+            <span style="color:red">NOTE:</span> You may need to modify the <tt>action</tt> attributes of the <tt>&lt;form&gt;</tt> tags to point at your
+            server. <br />The default hostname/port is <tt>http://localhost:8080</tt>.
+        </p>
+        <hr />
+        <h3>Save file</h3>
+        <form action="http://remote.ugrad.cs.ubc.ca:9999/putfile" method="POST">
+            <b>Filename</b>: <input type="text" name="filename" value="" /><br />
+            <b>Content</b>:<br /> <textarea cols=80 rows=10 name="content"></textarea><br /><br />
+            <input type="submit" />
+        </form>
+        
+    <body> 
+</html>

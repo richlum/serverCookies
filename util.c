@@ -103,37 +103,43 @@ const char *http_parse_path(const char *uri) {
 char *http_parse_header_field(char *request, int length, const char *header_field) {
     char *oldlf, *newlf, *newnull, *start;
     int len = strlen(header_field);
-    
+    TRACE
+    DBGMSG("searching for %s\n",header_field);
     // Ignore spaces in the beginning of the request
     while (isspace(*request) && length > 0) request++, length--;
-    
+//    TRACE
     for (oldlf = memchr(request, '\n', length); oldlf; oldlf = newlf) {
-        
+//        TRACE
+//        DBGMSG("oldlf=%x %s\n",(int)oldlf, oldlf);
         newlf = memchr(oldlf + 1, '\n', request + length - 1 - oldlf);
-        
+//        TRACE
         // If there is a null byte, it might be there from a previous call
         newnull = memchr(oldlf + 1, '\0', request + length - 1 - oldlf);
         if (newnull && newnull < newlf) newlf = newnull;
-        
+//        TRACE
         // If the request header ended, field was not found.
         if (newlf == oldlf + 1) return NULL;
         if (newlf == oldlf + 2 && oldlf[1] == '\r') return NULL;
-        
+//        TRACE
         for(start = oldlf + 1; isspace(*start); start++);
+//        TRACE
         if (!strncasecmp(start, header_field, len) && start[len] == ':') {
             // Remove initial spaces
             for(start += len + 1; isspace(*start); start++);
             // Remove trailing spaces
             for(; isspace(*newlf); newlf--) *newlf = '\0';
             // Return what is left.
+            TRACE
             return start;
         } else if (!*newlf) {
             // If header line ends with nulls already, moves on to the
             // last (corresponding to the old '\n').
+//        	TRACE
             for(; !newlf[1]; newlf++);
         }
+//        DBGMSG("newlf=%x %s\n",(int)newlf,newlf);
     }
-    
+    TRACE
     return NULL;
 }
 
@@ -147,14 +153,14 @@ char *http_parse_header_field(char *request, int length, const char *header_fiel
 const char *http_parse_body(const char *request, int length) {
     TRACE
     const char *oldlf, *newlf, *newnull;
-    
+    TRACE
     // Ignore spaces in the beginning of the request
     while (isspace(*request) && length > 0) request++, length--;
-    
+    TRACE
     for (oldlf = memchr(request, '\n', length);
          oldlf && (newlf = memchr(oldlf + 1, '\n', request + length - 1 - oldlf));
          oldlf = newlf) {
-        
+
         // If there is a null byte, it might be there from a previous call to header_field
         newnull = memchr(oldlf + 1, '\0', request + length - 1 - oldlf);
         if (newnull && newnull < newlf) newlf = newnull;
@@ -168,7 +174,7 @@ const char *http_parse_body(const char *request, int length) {
             for(; !newlf[1]; newlf++);
         }
     }
-    
+    TRACE
     return NULL;
 }
 
@@ -326,7 +332,8 @@ char* increaseBufferSizeBy(char* buffer, unsigned int* bufsize, unsigned int inc
 	int newsize = *bufsize+increase+1;
 	char* newbuffer = (char*)malloc(newsize);
 	memset (newbuffer,'\0',newsize);
-	strncpy(newbuffer, buffer, *bufsize);
+	memcpy (newbuffer, buffer, *bufsize	);
+	//strncpy(newbuffer, buffer, *bufsize);
 	free(buffer);
 	buffer=newbuffer;
 	*bufsize=newsize;
