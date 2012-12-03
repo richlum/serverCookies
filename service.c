@@ -483,10 +483,9 @@ void handle_client(int socket) {
 		char* endhdrs = strstr(msgbuf,"\r\n\r\n");
 		DBGMSG("strlen endhdrs = %d\n", (int)strlen(endhdrs));
 		TRACE
-		hexprint(msgbuf, 500);
 		DBGMSG("complete message %d\n" , __LINE__);
 		//now have complete first part of message since we have blank line ie \r\n\r\n
-		fprintf(stderr, "received:$%s$\n",msgbuf);
+		//fprintf(stderr, "received:$%s$\n",msgbuf);
 		int sizeofheader = getSizeofHeader(msgbuf);
 		DBGMSG("sizeofHeader = %d\n", sizeofheader);
 		//int sizeofheader = getSizeofHeader(msgbuf);
@@ -495,24 +494,18 @@ void handle_client(int socket) {
 
 	/****   get rest of body (if any) **************/
 		//content_length = getContentLength(msgbuf,msgsize);
-		hexprint(msgbuf,500);
 		inContentLen = getContentLength(msgbuf,msgsize);
 		if (inContentLen>0){
 			DBGMSG("content length = %d\n",resp.contentlength);
 			int read = msgsize - sizeofheader;
 			if (sizeleft<inContentLen-read){
 				// incr size should be min of contentlength-read-sizeleft
-				TRACE
-				hexprint(msgbuf,500);
 				msgbuf = increaseBufferSizeBy(msgbuf,msgbufsize, inContentLen);
-				TRACE
 				sizeleft= *msgbufsize - msgsize -1;
-				hexprint(msgbuf,500);
 			}
 			TRACE//todo this spot - some messages have bunch of nulls after content length inserted
 			DBGMSG("read = %d\n",read);
 			DBGMSG("msgsize = %d\n",msgsize);
-			hexprint(msgbuf,500);
 			while(read<inContentLen){
 				//get the missing body parts
 				DBGMSG("missing %d bytes from body",inContentLen-read);
@@ -531,7 +524,6 @@ void handle_client(int socket) {
 			}
 		}
 		//now we have complete header and body (if any)
-		hexprint(msgbuf,500);
 	/***** parse command ********************/
 		TRACE
 
@@ -859,24 +851,15 @@ void handle_client(int socket) {
 				break;
 			case CMDPUTFILE: ;
 				TRACE
-				hexprint(msgbuf,*msgbufsize);
 				char * lengthstr = http_parse_header_field(msgbuf, *msgbufsize, "Content-Length");
 				int length = atoi(lengthstr);
-				//int length =inContentLen;
 				DBGMSG("contentlength=%d\n",length);
 				DBGMSG("msgbuf='%s'\n",msgbuf	);
 				TRACE
-				hexprint(msgbuf,80);
 				const char *postbody =  http_parse_body(msgbuf, *msgbufsize) ;
-				//const char *postbody = strstr(msgbuf, "\r\n\r\n");
-//				if (postbody==NULL) postbody = strstr(msgbuf,"\0\n");
-//				if (postbody==NULL) postbody = strstr(msgbuf,"\0\0");
-				//postbody=postbody+4;
+
 				if (postbody==NULL) postbody = strstr(msgbuf,"filename=");
-				//const char* postbody = endhdrs+4;
 				TRACE
-				//DBGMSG("postbody=%s\n",postbody)
-				hexprint (postbody, 50);
 				if (strncasecmp(postbody,"filename",strlen("filename"))!=0){
 					respindex = 25;
 					strcpy(body,"Missing required filename argument");
@@ -928,7 +911,7 @@ void handle_client(int socket) {
 //				}
 
 				TRACE
-				FILE* fp = fopen(uploadfn,"a");
+				FILE* fp = fopen(uploadfn,"w");
 				i=0;
 				while((i<newsize)&&(fputc(*decodedcontent, fp))){
 					decodedcontent++;

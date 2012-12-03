@@ -151,12 +151,10 @@ char *http_parse_header_field(char *request, int length, const char *header_fiel
  * called after calls to other parse functions.
  */
 const char *http_parse_body(const char *request, int length) {
-    TRACE
+
     const char *oldlf, *newlf, *newnull;
-    TRACE
     // Ignore spaces in the beginning of the request
     while (isspace(*request) && length > 0) request++, length--;
-    TRACE
     for (oldlf = memchr(request, '\n', length);
          oldlf && (newlf = memchr(oldlf + 1, '\n', request + length - 1 - oldlf));
          oldlf = newlf) {
@@ -174,7 +172,6 @@ const char *http_parse_body(const char *request, int length) {
             for(; !newlf[1]; newlf++);
         }
     }
-    TRACE
     return NULL;
 }
 
@@ -322,7 +319,7 @@ char* doubleBufferSize(char* buffer, unsigned int* msgbufsize){
 	newbuffer=NULL;
 	*msgbufsize=2*(*msgbufsize);
 	DBGMSG("size of new buffer = %d\n",*msgbufsize);
-	DBGMSG("$:%s\n",buffer);
+	//DBGMSG("$:%s\n",buffer);
 	return buffer;
 }
 // allocate new size buffer, copy old to new,
