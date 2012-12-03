@@ -81,9 +81,9 @@ const char* responsestr[] ={
 };
 
 typedef enum {
-    CMDLOGIN, CMDLOGOUT,CMDSERVERTIME,CMDBROWSER,CMDREDIRECT,
-    CMDGETFILE,CMDPUTFILE,CMDADDCART,CMDDELCART,CMDCHECKOUT,
-    CMDCLOSE
+	CMDLOGIN, CMDLOGOUT,CMDSERVERTIME,CMDBROWSER,CMDREDIRECT,
+	CMDGETFILE,CMDPUTFILE,CMDADDCART,CMDDELCART,CMDCHECKOUT,
+	CMDCLOSE
 } servcmd;
 
 const char* server_commands[] = {
@@ -107,6 +107,7 @@ const char* default_http_contenttype = "Content-Type: text/plain";
 const char* appl_octet_http_contenttype = "Content-Type: application/octet-stream";
 const char* default_http_cache_control = "Cache-Control: public";
 const char* nocache_http_cache_control = "Cache-Control: no-cache";
+const char* private_http_cache_control = "Cache-Control: private";
 const char* lineend = "\r\n";
 const char* default_http_cookie_opt = "; path=/; Max-Age=86400;";
 const char* expirenow_http_cookie_opt = "; path=/; Max-Age=0;";
@@ -265,7 +266,7 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		if (p)
 			p++;
 		TRACE
-//		DBGMSG("p=%s\n", p);
+		//		DBGMSG("p=%s\n", p);
 	}
 	TRACE
 	if(p==NULL){
@@ -326,8 +327,8 @@ char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuest
 	//DBGMSG("p=%s\n",p);
 	//DBGMSG("*p=%x %c\n",*p, *p);
 	//DBGMSG("attribName (%d) = %s\n", strlen(attribName), attribName);
-//	int rc = strncasecmp(p,attribName,strlen(attribName));
-//	DBGMSG("strncasecmp result = %d\n",rc );
+	//	int rc = strncasecmp(p,attribName,strlen(attribName));
+	//	DBGMSG("strncasecmp result = %d\n",rc );
 	while((*p!='\0')&&(*p!='\r')&&(*p!='\n')
 			&&(strncasecmp(p,attribName,strlen(attribName))!=0)){
 		p=strchr(p,';');
@@ -398,20 +399,60 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 	return cartbody;
 }
 
+void check_if_method_error(http_method method,
+		char* msgbuf, int* respindex, const char* path) {
+	switch (method) {
 
+	case METHOD_GET:
+		DBGMSG("path=%s\n", path );
+		TRACE
+		break;
+	case METHOD_POST:
+		//handle partial request
+		DBGMSG("path=%s\n", path );
+		//char* value = http_parse_header_field(msgbuf,*msgbufsize,(const char*)"Content-length");
+		//			contentlength=atoi(value);
+		//			// is this count include /r/n - exclude headers?
+		//			body = http_parse_body(msgbuf,contentlength);
+
+		const char* abody = http_parse_body(msgbuf, bufsize);
+		if (abody == NULL ) {
+			//todo fix this : sizeof will not work
+			fprintf(stderr, "nobody %d \n", (int) sizeof(abody));
+		} else {
+			fprintf(stderr, "body = %s\n\n", abody);
+		}
+		break;
+	case METHOD_HEAD:
+	case METHOD_OPTIONS:
+	case METHOD_PUT:
+	case METHOD_DELETE:
+	case METHOD_TRACE:
+	case METHOD_CONNECT:
+		fprintf(stderr, "Unspported Method called %s \n", http_method_str[method]);
+		*respindex = 34;
+		break;
+	case METHOD_UNKNOWN:
+		fprintf(stderr, "unknown method called %d \n", method);
+		*respindex = 34;
+		break;
+	default:
+
+		break;
+	}
+	return ;
+}
 
 void handle_client(int socket) {
-    
-    /* TODO REFACTOR This.
-     * It's one big ugly do loop but wasnt sure what I needed
-     * access to during developement.  Once it works, we need to
-     * pull up some methods to make it more readable and define
-     * interfaces for sub methods.
-     */
+
+	/* TODO REFACTOR This.
+	 * It's one big ugly do loop but wasnt sure what I needed
+	 * access to during developement.  Once it works, we need to
+	 * pull up some methods to make it more readable and define
+	 * interfaces for sub methods.
+	 */
 	TRACE
 
-	//request body if any
-	const char *abody;
 
 	//socket recv parameter
 	int flag=0;
@@ -457,7 +498,7 @@ void handle_client(int socket) {
 		fprintf(stderr, "$%2d:%s\n",bytesin, msgbuf);
 		int sizeleft=0;
 
-	/***** recv header until complete ***********/
+		/***** recv header until complete ***********/
 		while((!message_has_newlines(msgbuf))&&(bytesin>0)){
 			TRACE
 			sizeleft = *msgbufsize - msgsize-1;
@@ -490,7 +531,7 @@ void handle_client(int socket) {
 		sizeofheader = http_header_complete(msgbuf, msgsize);
 		DBGMSG("sizeofHeader = %d\n", sizeofheader);
 
-	/****   get rest of body (if any) **************/
+		/****   get rest of body (if any) **************/
 		//content_length = getContentLength(msgbuf,msgsize);
 		inContentLen = getContentLength(msgbuf,msgsize);
 		if (inContentLen>0){
@@ -522,7 +563,7 @@ void handle_client(int socket) {
 			}
 		}
 		//now we have complete header and body (if any)
-	/***** parse command ********************/
+		/***** parse command ********************/
 		TRACE
 
 		//connection
@@ -545,49 +586,10 @@ void handle_client(int socket) {
 		fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
 		int respindex=-1;
 		path = http_parse_path(http_parse_uri(msgbuf));
-		switch (method){
-
-		case METHOD_GET:
-			DBGMSG("path=%s\n", path );
-			TRACE
-			break;
-		case METHOD_POST:
-			//handle partial request
-			DBGMSG("path=%s\n", path );
-			//char* value = http_parse_header_field(msgbuf,*msgbufsize,(const char*)"Content-length");
-	//			contentlength=atoi(value);
-	//			// is this count include /r/n - exclude headers?
-	//			body = http_parse_body(msgbuf,contentlength);
-
-			abody = http_parse_body(msgbuf,bufsize);
-			if (abody == NULL){
-				//todo fix this : sizeof will not work
-				fprintf(stderr,"nobody %d \n", (int)sizeof(abody));
-			}else{
-				fprintf(stderr, "body = %s\n\n",abody);
-			}
-			break;
-		case METHOD_HEAD:
-		case METHOD_OPTIONS:
-		case METHOD_PUT:
-		case METHOD_DELETE:
-		case METHOD_TRACE:
-		case METHOD_CONNECT:
-			fprintf(stderr,"Unspported Method called %s \n", http_method_str[method]);
-			respindex=34;
-			break;
-		case METHOD_UNKNOWN:
-			fprintf(stderr,"unknown method called %d \n", method);
-			respindex=34;
-			break;
-		default:
-
-
-			break;
-		}
+		check_if_method_error(method, msgbuf, &respindex, path);
 
 		TRACE
-	/********** process cmd to  build response ******************************/
+		/********** process cmd to  build response ******************************/
 		//hexprint(path, strlen(path)+2);
 
 		//int contlength=0;
@@ -649,36 +651,37 @@ void handle_client(int socket) {
 			switch (cmd){
 			DBGMSG("username=%s\n",usernamevalue);
 			case CMDLOGIN:  ;  //http://shareprogrammingtips.com/c-language-programming-tips/why-variables-can-not-be-declared-in-a-switch-statement-just-after-labels/
-				;
+			;
+			TRACE
+			if (path==NULL){
 				TRACE
-				if (path==NULL){
-					TRACE
-					respindex=19;
-					strcpy (body, "No Path provided");
-					resp.contentlength=strlen(body);
-					break;
-				}
-				char* user = getargvalue("username", path, username);
-				TRACE
-				if ((user)&&(strlen(user)>0)){
-					if ((strlen(cmdresponsefields))!=0){
-						strcat (cmdresponsefields,lineend);
-					}
-					strcat(cmdresponsefields, default_http_cookie_header);
-					strcat(cmdresponsefields, "username=");
-					strcat(cmdresponsefields, user);
-					strcat(cmdresponsefields, default_http_cookie_opt);
-
-					respindex=2;
-					strcpy(usernamebody,"Username: ");
-					strcat(usernamebody,user);
-					//strcat(usernamebody,lineend);
-				}else{
-					respindex=19;
-					strcpy(body,"Not Logged in");
-					resp.contentlength+=strlen(body);
-				}
+				respindex=19;
+				strcpy (body, "No Path provided");
+				resp.contentlength=strlen(body);
 				break;
+			}
+			char* user = getargvalue("username", path, username);
+			TRACE
+			if ((user)&&(strlen(user)>0)){
+				if ((strlen(cmdresponsefields))!=0){
+					strcat (cmdresponsefields,lineend);
+				}
+				strcat(cmdresponsefields, default_http_cookie_header);
+				strcat(cmdresponsefields, "username=");
+				strcat(cmdresponsefields, user);
+				strcat(cmdresponsefields, default_http_cookie_opt);
+
+				respindex=2;
+				resp.cache=PRIVATE;
+				strcpy(usernamebody,"Username: ");
+				strcat(usernamebody,user);
+				//strcat(usernamebody,lineend);
+			}else{
+				respindex=19;
+				strcpy(body,"Not Logged in");
+				resp.contentlength+=strlen(body);
+			}
+			break;
 			case CMDLOGOUT:
 				TRACE
 				if ((usernamevalue)&&(strlen(usernamevalue)>0)){
@@ -692,6 +695,7 @@ void handle_client(int socket) {
 					strcat(cmdresponsefields, expirenow_http_cookie_opt);
 
 					respindex=2;
+					resp.cache=PRIVATE;
 					strcpy(usernamebody,"User ");
 					strcat(usernamebody,usernamevalue);
 					strcat(usernamebody," was logged out");
@@ -726,6 +730,7 @@ void handle_client(int socket) {
 				TRACE
 				//contlength=strlen(body);
 				resp.contentlength+=strlen(body);
+				resp.cache=PRIVATE;
 				break;
 			case CMDREDIRECT:
 				TRACE
@@ -751,325 +756,330 @@ void handle_client(int socket) {
 				}
 
 				break;
+
 			case CMDGETFILE:  ;
+			TRACE
+			char filename[bufsize];
+			char* pfn = getargvalue("filename", path, filename);
+			DBGMSG("pfn = %s\n",pfn);
+			if (pfn==NULL){
 				TRACE
-				char filename[bufsize];
-				char* pfn = getargvalue("filename", path, filename);
-				DBGMSG("pfn = %s\n",pfn);
-				if (pfn==NULL){
-					TRACE
-					respindex=19;
-					strcpy(body,"No filneame given");
-					resp.contentlength+=strlen(body);
-					break;
-				}
-				char lastmodifileddate[bufsize];
-				char* lstmodfldate = getargvalue("If-Modified-Since",path, lastmodifileddate);
+				respindex=19;
+				strcpy(body,"No filneame given");
+				resp.contentlength+=strlen(body);
+				break;
+			}
+			char lastmodifileddate[bufsize];
+			char* lstmodfldate = getargvalue("If-Modified-Since",path, lastmodifileddate);
 
 
-				struct stat filestat;
-				//int file = open(pfn, O_RDONLY);
-				if (stat (pfn,&filestat)<0)
-					perror("failed to stat file");
-				resp.contentlength = filestat.st_size;
+			struct stat filestat;
+			//int file = open(pfn, O_RDONLY);
+			if (stat (pfn,&filestat)<0)
+				perror("failed to stat file");
+			resp.contentlength = filestat.st_size;
 
-				DBGMSG ("filesize = %d\n", resp.contentlength);
-				time_t modtime = filestat.st_mtime;
-				struct tm* mtm = gmtime(&modtime);
-				char filetime[bufsize];
-				char* pftime = filetime;
-				strftime(filetime, bufsize, timeformatstr,mtm);
-				DBGMSG("file mod time : %s\n",filetime);
-				int downloadfile=1;
-				//time_t btime;
-				if (lstmodfldate!=NULL){
-					DBGMSG("lstmodfldate = %s\n",lstmodfldate);
+			DBGMSG ("filesize = %d\n", resp.contentlength);
+			time_t modtime = filestat.st_mtime;
+			struct tm* mtm = gmtime(&modtime);
+			char filetime[bufsize];
+			char* pftime = filetime;
+			strftime(filetime, bufsize, timeformatstr,mtm);
+			DBGMSG("file mod time : %s\n",filetime);
+			int downloadfile=1;
+			//time_t btime;
+			if (lstmodfldate!=NULL){
+				DBGMSG("lstmodfldate = %s\n",lstmodfldate);
 
-					struct tm storage;// ={0,0,0,0,0,0,0,0,0};
-					memset (&storage,'\0', sizeof(storage));
-					//char *p=NULL;
-					//p=(char*)strptime(lstmodfldate,timeformatstr,&storage);
-					time_t ftime = to_seconds(pftime, timeformatstr);
-					time_t itime = to_seconds(lstmodfldate, timeformatstr);
+				struct tm storage;// ={0,0,0,0,0,0,0,0,0};
+				memset (&storage,'\0', sizeof(storage));
+				//char *p=NULL;
+				//p=(char*)strptime(lstmodfldate,timeformatstr,&storage);
+				time_t ftime = to_seconds(pftime, timeformatstr);
+				time_t itime = to_seconds(lstmodfldate, timeformatstr);
 
-					if (itime<ftime){
+				if (itime<ftime){
 					//if (mktime(&storage)<mktime(mtm)){
-						downloadfile=1;
-						TRACE
-						//file has been modified since browsers informed time
-					}else{
-						TRACE
-						downloadfile=0;
-						respindex = 13;
-						strcpy(body,"Not Modified");
-						resp.contentlength=sizeof(body);
-					}
+					downloadfile=1;
+					TRACE
+					//file has been modified since browsers informed time
+				}else{
+					TRACE
+					downloadfile=0;
+					respindex = 13;
+					strcpy(body,"Not Modified");
+					resp.contentlength=sizeof(body);
 				}
-				if (downloadfile==1){
-					if (bufsize < resp.contentlength){
-						free(body);
-						body = (char*)malloc (resp.contentlength + 100);
-					}
-//					strcat(body, "filename=download.txt&content=");
-					char* bptr =body;// + strlen("filename=download.txt&content=");
-					FILE* fp;
-					fp = fopen(pfn,"r");
-					size_t bytes = fread(bptr, 1, resp.contentlength, fp);
-					//int bytes = read(file, body, resp.contentlength );
-					fprintf(stderr,"bytes read = %d\n",(int) bytes);
-
-					//resp.contentlength=strlen(body);
-					resp.contentlength=bytes;
-					DBGMSG("bodysize = %d\n",resp.contentlength);
-					int fres = fclose(fp);
-
-					fprintf(stderr, "close rc=%d\n", fres);
+			}
+			if (downloadfile==1){
+				if (bufsize < resp.contentlength){
+					free(body);
+					body = (char*)malloc (resp.contentlength + 100);
 				}
+				//					strcat(body, "filename=download.txt&content=");
+				char* bptr =body;// + strlen("filename=download.txt&content=");
+				FILE* fp;
+				fp = fopen(pfn,"r");
+				size_t bytes = fread(bptr, 1, resp.contentlength, fp);
+				//int bytes = read(file, body, resp.contentlength );
+				fprintf(stderr,"bytes read = %d\n",(int) bytes);
 
-				TRACE
-				if ((strlen(cmdresponsefields))!=0){
-					strcat (cmdresponsefields,lineend);
-				}
-				strcat(cmdresponsefields, "Content-Location: ");
-				strcat(cmdresponsefields, pfn);
-				strcat(cmdresponsefields, lineend);
-				strcat(cmdresponsefields, "Last-Modified: ");
-				strcat(cmdresponsefields, filetime);
-				//strcat(cmdresponsefields, lineend);
+				//resp.contentlength=strlen(body);
+				resp.contentlength=bytes;
+				DBGMSG("bodysize = %d\n",resp.contentlength);
+				int fres = fclose(fp);
 
-				resp.content=APPL_OCTET;
-				respindex=2;
-				resp.dontmodifybody=1;
-				//strcpy(body,"file transfer: ");
-				//strcpy(body, pfn);
-				//resp.contentlength+=strlen(body);
-				TRACE
-				DBGMSG("size of body = %d\n",(int)strlen(body));
-				DBGMSG("resp.contentlength = %d\n",resp.contentlength);
-				break;
+				fprintf(stderr, "close rc=%d\n", fres);
+			}
+
+			TRACE
+			if ((strlen(cmdresponsefields))!=0){
+				strcat (cmdresponsefields,lineend);
+			}
+			strcat(cmdresponsefields, "Content-Location: ");
+			strcat(cmdresponsefields, pfn);
+			strcat(cmdresponsefields, lineend);
+			strcat(cmdresponsefields, "Last-Modified: ");
+			strcat(cmdresponsefields, filetime);
+			//strcat(cmdresponsefields, lineend);
+
+			resp.content=APPL_OCTET;
+			respindex=2;
+			resp.cache=PRIVATE;
+			resp.dontmodifybody=1;
+			//strcpy(body,"file transfer: ");
+			//strcpy(body, pfn);
+			//resp.contentlength+=strlen(body);
+			TRACE
+			DBGMSG("size of body = %d\n",(int)strlen(body));
+			DBGMSG("resp.contentlength = %d\n",resp.contentlength);
+			break;
+
 			case CMDPUTFILE: ;
-				TRACE
-				char * lengthstr = http_parse_header_field(msgbuf, *msgbufsize, "Content-Length");
-				int length = atoi(lengthstr);
-				DBGMSG("contentlength=%d\n",length);
-				DBGMSG("msgbuf='%s'\n",msgbuf	);
-				TRACE
-				const char *postbody =  http_parse_body(msgbuf, *msgbufsize) ;
+			TRACE
+			char * lengthstr = http_parse_header_field(msgbuf, *msgbufsize, "Content-Length");
+			int length = atoi(lengthstr);
+			DBGMSG("contentlength=%d\n",length);
+			DBGMSG("msgbuf='%s'\n",msgbuf	);
+			TRACE
+			const char *postbody =  http_parse_body(msgbuf, *msgbufsize) ;
 
-				if (postbody==NULL) postbody = strstr(msgbuf,"filename=");
-				TRACE
-				if (strncasecmp(postbody,"filename",strlen("filename"))!=0){
-					respindex = 25;
-					strcpy(body,"Missing required filename argument");
-					resp.contentlength=strlen(body);
-					break;
-				}
-				TRACE
-				char* bptr = strchr(postbody,'=');
-				bptr++;
-				//hexprint(bptr,40);
-				char uploadfn[bufsize];
-				memset (uploadfn,'\0',bufsize);
-				int i=0;
-				while((*bptr!='&')&&(*bptr!='\r')&&
-						(*bptr!='\n')&&(*bptr!='\0')){
-					uploadfn[i]=*bptr;
-					bptr++;
-					i++;
-				}
-				uploadfn[i]='\0';
-				DBGMSG("filename=%s\n",uploadfn);
-				TRACE
-
-				while(*bptr=='&'){
-					bptr++;
-				}
-				TRACE
-				if (strncasecmp(bptr,"content=",strlen("content="))!=0){
-					respindex = 25;
-					strcpy(body,"Missing required content argument");
-					resp.contentlength=strlen(body);
-					break;
-				}
-				bptr = strchr(bptr,'=');
-				bptr++;
-				TRACE
-				//now pointing at first byte of content, of size 'length'
-				char *decode(const char *original, char *decoded) ;
-				char* decodedcontent = (char*) malloc(length+20);
-				memset(decodedcontent,'\0',length+20);
-				decodedcontent = decode(bptr, decodedcontent);
-				int newsize = strlen(decodedcontent);
-
-//				if (access(uploadfn, W_OK)!=0){
-//					respindex = 19;
-//					strcpy(body,"Insufficient access privilige");
-//					resp.contentlength=strlen(body);
-//					break;
-//				}
-
-				TRACE
-				FILE* fp = fopen(uploadfn,"w");
-				i=0;
-				while((i<newsize)&&(fputc(*decodedcontent, fp))){
-					decodedcontent++;
-					i++;
-				}
-				fclose(fp);
-				strcat (body,"file saved: ");
-				strcat (body, uploadfn);
+			if (postbody==NULL) postbody = strstr(msgbuf,"filename=");
+			TRACE
+			if (strncasecmp(postbody,"filename",strlen("filename"))!=0){
+				respindex = 25;
+				strcpy(body,"Missing required filename argument");
 				resp.contentlength=strlen(body);
-				respindex=2;
-
-				TRACE
 				break;
+			}
+			TRACE
+			char* bptr = strchr(postbody,'=');
+			bptr++;
+			//hexprint(bptr,40);
+			char uploadfn[bufsize];
+			memset (uploadfn,'\0',bufsize);
+			int i=0;
+			while((*bptr!='&')&&(*bptr!='\r')&&
+					(*bptr!='\n')&&(*bptr!='\0')){
+				uploadfn[i]=*bptr;
+				bptr++;
+				i++;
+			}
+			uploadfn[i]='\0';
+			DBGMSG("filename=%s\n",uploadfn);
+			TRACE
+
+			while(*bptr=='&'){
+				bptr++;
+			}
+			TRACE
+			if (strncasecmp(bptr,"content=",strlen("content="))!=0){
+				respindex = 25;
+				strcpy(body,"Missing required content argument");
+				resp.contentlength=strlen(body);
+				break;
+			}
+			bptr = strchr(bptr,'=');
+			bptr++;
+			TRACE
+			//now pointing at first byte of content, of size 'length'
+			char *decode(const char *original, char *decoded) ;
+			char* decodedcontent = (char*) malloc(length+20);
+			memset(decodedcontent,'\0',length+20);
+			decodedcontent = decode(bptr, decodedcontent);
+			int newsize = strlen(decodedcontent);
+
+			//				if (access(uploadfn, W_OK)!=0){
+			//					respindex = 19;
+			//					strcpy(body,"Insufficient access privilige");
+			//					resp.contentlength=strlen(body);
+			//					break;
+			//				}
+
+			TRACE
+			FILE* fp = fopen(uploadfn,"w");
+			i=0;
+			while((i<newsize)&&(fputc(*decodedcontent, fp))){
+				decodedcontent++;
+				i++;
+			}
+			fclose(fp);
+			strcat (body,"file saved: ");
+			strcat (body, uploadfn);
+			resp.contentlength=strlen(body);
+			resp.cache=PRIVATE;
+			respindex=2;
+
+			TRACE
+			break;
 			case CMDADDCART: ;
-				TRACE
-				char an_item[MAXITEMLEN];
-				char* cartitem = getargvalue("item", path, an_item);
-				// get the items from cookies
-				//shopping cart structure for handling addcart items
+			TRACE
+			char an_item[MAXITEMLEN];
+			char* cartitem = getargvalue("item", path, an_item);
+			// get the items from cookies
+			//shopping cart structure for handling addcart items
 
-				memset(items,'\0',MAXITEMS*MAXITEMLEN);
-				itemcount = 0;
-				memset(itemstring,'\0',bufsize);
+			memset(items,'\0',MAXITEMS*MAXITEMLEN);
+			itemcount = 0;
+			memset(itemstring,'\0',bufsize);
+			itemlabelptr = getItemLabel(itemcount,itemlabel);
+			itemptr = cookieptr;
+			TRACE
+
+			while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
+					!=NULL){
+				strcpy(items[itemcount],itemptr);
+				itemcount++;
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
-				itemptr = cookieptr;
-				TRACE
+			}
+			// we now have recovered all addcart items from cookies
+			//itemcount is the next blank
+			assert(itemcount<=MAXITEMS);
 
-				while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
-						!=NULL){
-					strcpy(items[itemcount],itemptr);
+			if (cartitem){
+				assert (strlen (cartitem)< MAXITEMLEN);
+				strcpy(items[itemcount],cartitem);
+
+				itemlabelptr = getItemLabel(itemcount,itemlabel);
+				strcat(cmdresponsefields, default_http_cookie_header);
+				strcat(cmdresponsefields," ");
+				strcat(cmdresponsefields,itemlabelptr);
+				strcat(cmdresponsefields, "=");
+				strcat(cmdresponsefields, cartitem);
+				strcat(cmdresponsefields, default_http_cookie_opt);
+
+				cartbody = buildCartBody((char*)items,itemcount, cartbody);
+				resp.contentlength+=strlen(cartbody);
+				itemcount++;
+				respindex=2;
+				resp.cache=PRIVATE;
+			}else{
+				respindex=19;
+				strcpy(usernamebody,"No user name found");
+			}
+			TRACE
+			DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
+
+			break;
+			case CMDDELCART:  ;
+			TRACE
+			char del_item[MAXITEMLEN];
+			char* delete_item = getargvalue("itemnr", path, del_item);
+			TRACE
+			DBGMSG("del item = %s\n",delete_item);
+			if (delete_item==NULL){
+				TRACE
+				respindex=19;
+				strcpy(usernamebody,"No itemnr found");
+				break;
+			}
+			//delete_item+=strlen("item");
+			int itemnumber = atoi(delete_item);
+			if ((itemnumber<0)||(itemnumber>MAXITEMS)){
+				fprintf(stderr, "itemnumber (%d) out of range",itemnumber);
+			}
+			DBGMSG("itemnumber to delete=%d\n",itemnumber);
+			// get the items from cookies
+			//shopping cart structure for handling addcart items
+
+			memset(items,'\0',MAXITEMS*MAXITEMLEN);
+			itemcount = 0;
+			memset(itemstring,'\0',bufsize);
+			itemlabelptr = getItemLabel(itemcount,itemlabel);
+			itemptr = cookieptr;
+			TRACE
+
+			while(itemptr!=NULL){
+				itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring);
+				TRACE
+				if (itemptr!=NULL){
+					DBGMSG("%d  itemptr=%s\n",itemcount,itemptr);
+					strcpy(items[itemcount*MAXITEMLEN],itemptr);
+					TRACE
 					itemcount++;
 					itemlabelptr = getItemLabel(itemcount,itemlabel);
+				}else{
+					break;
 				}
-				// we now have recovered all addcart items from cookies
-				//itemcount is the next blank
-				assert(itemcount<=MAXITEMS);
 
-				if (cartitem){
-					assert (strlen (cartitem)< MAXITEMLEN);
-					strcpy(items[itemcount],cartitem);
-
-					itemlabelptr = getItemLabel(itemcount,itemlabel);
+			}
+			TRACE
+			// we now have recovered all addcart items from cookies
+			//int i;
+			for (i=0;i<=itemcount-1;i++){
+				DBGMSG("i=%d\n",i);
+				DBGMSG("ITEM='%s'\n",items[i*MAXITEMLEN]);
+				if (i<itemnumber){
+					//do nothing
+					TRACE
+				}else if (i==itemcount-1){
+					//delete this one
+					TRACE
+					itemlabelptr = getItemLabel(i,itemlabel);
 					strcat(cmdresponsefields, default_http_cookie_header);
 					strcat(cmdresponsefields," ");
 					strcat(cmdresponsefields,itemlabelptr);
 					strcat(cmdresponsefields, "=");
-					strcat(cmdresponsefields, cartitem);
-					strcat(cmdresponsefields, default_http_cookie_opt);
-
-					cartbody = buildCartBody((char*)items,itemcount, cartbody);
-					resp.contentlength+=strlen(cartbody);
-					itemcount++;
-					respindex=2;
+					strcat(cmdresponsefields, items[i*MAXITEMLEN]);
+					strcat(cmdresponsefields, expirenow_http_cookie_opt);
+					//items[itemcount]=NULL;
+					DBGMSG("final del (%d) cmdresponsefields='%s'\n",i,cmdresponsefields);
 				}else{
-					respindex=19;
-					strcpy(usernamebody,"No user name found");
-				}
-				TRACE
-				DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
-
-				break;
-			case CMDDELCART:  ;
-				TRACE
-				char del_item[MAXITEMLEN];
-				char* delete_item = getargvalue("itemnr", path, del_item);
-				TRACE
-				DBGMSG("del item = %s\n",delete_item);
-				if (delete_item==NULL){
 					TRACE
-					respindex=19;
-					strcpy(usernamebody,"No itemnr found");
-					break;
+					//all these elements have to shift down one
+					itemlabelptr = getItemLabel(i,itemlabel);
+					strcat(cmdresponsefields, default_http_cookie_header);
+					//strcat(cmdresponsefields," ");
+					strcat(cmdresponsefields,itemlabelptr);
+					strcat(cmdresponsefields, "=");
+					strcat(cmdresponsefields, items[(i+1)*MAXITEMLEN]);
+					strcat(cmdresponsefields, default_http_cookie_opt);
+					strcat(cmdresponsefields, lineend);
+					strncpy(items[i*MAXITEMLEN],items[(i+1)*MAXITEMLEN],MAXITEMLEN);
 				}
-				//delete_item+=strlen("item");
-				int itemnumber = atoi(delete_item);
-				if ((itemnumber<0)||(itemnumber>MAXITEMS)){
-					fprintf(stderr, "itemnumber (%d) out of range",itemnumber);
-				}
-				DBGMSG("itemnumber to delete=%d\n",itemnumber);
-				// get the items from cookies
-				//shopping cart structure for handling addcart items
+			}
+			TRACE
+			memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
+			char tempstr[bufsize];
+			memset(tempstr,'\0',bufsize);
+			for (i=0;i<itemcount-1;i++){
+				fprintf(stderr, "%s\n",items[i*MAXITEMLEN]);
+				sprintf(tempstr,"%d. ",i);
+				strcat(cartbody, tempstr);
+				strcat(cartbody, items[i*MAXITEMLEN]);
+				strcat(cartbody, lineend);
+			}
+			if (itemcount<=1)
+				strcpy(cartbody," EMPTY CART");
+			TRACE
+			DBGMSG("delcart cmdresponse = '%s'\n",cmdresponsefields);
+			DBGMSG("cartbody = '%s'\n",cartbody);
+			resp.contentlength+=strlen(cartbody);
+			itemcount--;
+			respindex=2;
+			resp.cache=PRIVATE;
 
-				memset(items,'\0',MAXITEMS*MAXITEMLEN);
-				itemcount = 0;
-				memset(itemstring,'\0',bufsize);
-				itemlabelptr = getItemLabel(itemcount,itemlabel);
-				itemptr = cookieptr;
-				TRACE
-
-				while(itemptr!=NULL){
-					itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring);
-					TRACE
-					if (itemptr!=NULL){
-						DBGMSG("%d  itemptr=%s\n",itemcount,itemptr);
-						strcpy(items[itemcount*MAXITEMLEN],itemptr);
-						TRACE
-						itemcount++;
-						itemlabelptr = getItemLabel(itemcount,itemlabel);
-					}else{
-						break;
-					}
-
-				}
-				TRACE
-				// we now have recovered all addcart items from cookies
-				//int i;
-				for (i=0;i<=itemcount-1;i++){
-					DBGMSG("i=%d\n",i);
-					DBGMSG("ITEM='%s'\n",items[i*MAXITEMLEN]);
-					if (i<itemnumber){
-						//do nothing
-						TRACE
-					}else if (i==itemcount-1){
-						//delete this one
-						TRACE
-						itemlabelptr = getItemLabel(i,itemlabel);
-						strcat(cmdresponsefields, default_http_cookie_header);
-						strcat(cmdresponsefields," ");
-						strcat(cmdresponsefields,itemlabelptr);
-						strcat(cmdresponsefields, "=");
-						strcat(cmdresponsefields, items[i*MAXITEMLEN]);
-						strcat(cmdresponsefields, expirenow_http_cookie_opt);
-						//items[itemcount]=NULL;
-						DBGMSG("final del (%d) cmdresponsefields='%s'\n",i,cmdresponsefields);
-					}else{
-						TRACE
-						//all these elements have to shift down one
-						itemlabelptr = getItemLabel(i,itemlabel);
-						strcat(cmdresponsefields, default_http_cookie_header);
-						//strcat(cmdresponsefields," ");
-						strcat(cmdresponsefields,itemlabelptr);
-						strcat(cmdresponsefields, "=");
-						strcat(cmdresponsefields, items[(i+1)*MAXITEMLEN]);
-						strcat(cmdresponsefields, default_http_cookie_opt);
-						strcat(cmdresponsefields, lineend);
-						strncpy(items[i*MAXITEMLEN],items[(i+1)*MAXITEMLEN],MAXITEMLEN);
-					}
-				}
-				TRACE
-				memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
-				char tempstr[bufsize];
-				memset(tempstr,'\0',bufsize);
-				for (i=0;i<itemcount-1;i++){
-					fprintf(stderr, "%s\n",items[i*MAXITEMLEN]);
-					sprintf(tempstr,"%d. ",i);
-					strcat(cartbody, tempstr);
-					strcat(cartbody, items[i*MAXITEMLEN]);
-					strcat(cartbody, lineend);
-				}
-				if (itemcount<=1)
-					strcpy(cartbody," EMPTY CART");
-				TRACE
-				DBGMSG("delcart cmdresponse = '%s'\n",cmdresponsefields);
-				DBGMSG("cartbody = '%s'\n",cartbody);
-				resp.contentlength+=strlen(cartbody);
-				itemcount--;
-				respindex=2;
-
-
-				break;
+			break;
 			case CMDCHECKOUT:
 				TRACE
 				if ((usernamevalue)&&(strlen(usernamevalue)>0)){
@@ -1135,6 +1145,7 @@ void handle_client(int socket) {
 					strcat(body, "Thank YOU for shopping at WalMart. Please come again");
 					resp.contentlength+=strlen(body);
 					respindex=2;
+					resp.cache=PRIVATE;
 				}else{
 					TRACE
 					respindex=19;
@@ -1147,6 +1158,8 @@ void handle_client(int socket) {
 				TRACE
 				persist_connection=0;
 				respindex=2;
+				if( strlen( usernamebody))
+					resp.cache=PRIVATE;
 				resp.connection=CLOSE;
 				strcpy(body, "The connection will now be closed");
 				//contlength=strlen(body);
@@ -1165,7 +1178,7 @@ void handle_client(int socket) {
 				break;
 			}
 		}
-/**************** assemble response *******************/
+		/**************** assemble response *******************/
 		TRACE
 		DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 		char* response;
@@ -1189,6 +1202,8 @@ void handle_client(int socket) {
 
 			if (resp.cache==NOCACHE)
 				response = addfield(response, nocache_http_cache_control,&responsebuffersize);
+			else if (resp.cache==PRIVATE)
+				response = addfield(response, private_http_cache_control,&responsebuffersize);
 			else
 				response = addfield(response, default_http_cache_control,&responsebuffersize);
 			char timestr[bufsize];
@@ -1202,8 +1217,8 @@ void handle_client(int socket) {
 			DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 			// adjust content length: prepend all output with username info if any
 			if ((strlen(usernamebody)!=0)&&(resp.dontmodifybody!=1)){
-					resp.contentlength+=strlen(usernamebody) + strlen(lineend) ;
-					//contlength += strlen() + strlen(lineend) ;
+				resp.contentlength+=strlen(usernamebody) + strlen(lineend) ;
+				//contlength += strlen() + strlen(lineend) ;
 			}
 			DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 			if (resp.contentlength!=0){
@@ -1217,7 +1232,7 @@ void handle_client(int socket) {
 			// attach the body now
 			// prepend username before response
 			if ((strlen(usernamebody)!=0)&&(resp.dontmodifybody!=1)){
-					response = addfield(response, usernamebody, &responsebuffersize);
+				response = addfield(response, usernamebody, &responsebuffersize);
 			}
 			// response body
 			if ((resp.contentlength!=0)&&(strlen(body)>0)){
@@ -1240,7 +1255,7 @@ void handle_client(int socket) {
 
 		fprintf(stderr,"RESPONSE: $%s", response);
 
-	/*********  send response *******************************/
+		/*********  send response *******************************/
 		TRACE
 		int sent=0;
 		int bytesout = send(socket,response,strlen(response),flag);
@@ -1255,9 +1270,9 @@ void handle_client(int socket) {
 				sent+=bytesout;
 				bytesout = send(socket,response+sent,strlen(response+sent),flag);
 				if (bytesout==0){
-							fprintf(stderr, "remote closed connection, child closing\n");
-							persist_connection=0;
-							break;
+					fprintf(stderr, "remote closed connection, child closing\n");
+					persist_connection=0;
+					break;
 				}
 				if (bytesout<0)
 					perror("recv error:");
