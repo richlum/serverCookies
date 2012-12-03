@@ -290,7 +290,7 @@ char* getargvalue(const char* argname, const char* path, char* value){
 			return NULL;
 		value[i]='\0';
 		TRACE
-		DBGMSG("%d, value=%s\n", strlen(value), value);
+		DBGMSG("%d, value=%s\n",(int) strlen(value), value);
 
 		char* decodedvalue = (char*)malloc (strlen(value)*2);
 		memset(decodedvalue,'\0',strlen(value)*2);
@@ -299,7 +299,7 @@ char* getargvalue(const char* argname, const char* path, char* value){
 		free(decodedvalue);
 		decodedvalue=NULL;
 		TRACE
-		DBGMSG("%d, value=%s\n", strlen(value), value);
+		DBGMSG("%d, value=%s\n", (int)strlen(value), value);
 		return value;
 	}
 	TRACE
@@ -309,7 +309,7 @@ char* getargvalue(const char* argname, const char* path, char* value){
 
 char* getdecodedCookieAttribute(char* cookieptr, char* attribName, char* valuestore){
 	TRACE
-	DBGMSG("searching for (%d) attribute='%s'\n", strlen(attribName),attribName);
+	DBGMSG("searching for (%d) attribute='%s'\n",(int) strlen(attribName),attribName);
 	char* p = cookieptr;
 	char* result;
 	// expecting ptr to first attribute name or blanks preceding it.
@@ -481,7 +481,7 @@ void handle_client(int socket) {
 		}
 
 		char* endhdrs = strstr(msgbuf,"\r\n\r\n");
-		DBGMSG("strlen endhdrs = %d\n", strlen(endhdrs));
+		DBGMSG("strlen endhdrs = %d\n", (int)strlen(endhdrs));
 		TRACE
 		//hexprint(msgbuf, msgsize+2);
 		DBGMSG("complete message %d\n" , __LINE__);
@@ -821,7 +821,7 @@ void handle_client(int socket) {
 					fp = fopen(pfn,"r");
 					size_t bytes = fread(bptr, 1, resp.contentlength, fp);
 					//int bytes = read(file, body, resp.contentlength );
-					fprintf(stderr,"bytes read = %d\n", bytes);
+					fprintf(stderr,"bytes read = %d\n",(int) bytes);
 
 					//resp.contentlength=strlen(body);
 					resp.contentlength=bytes;
@@ -849,7 +849,7 @@ void handle_client(int socket) {
 				//strcpy(body, pfn);
 				//resp.contentlength+=strlen(body);
 				TRACE
-				DBGMSG("size of body = %d\n",strlen(body));
+				DBGMSG("size of body = %d\n",(int)strlen(body));
 				DBGMSG("resp.contentlength = %d\n",resp.contentlength);
 				break;
 			case CMDPUTFILE: ;
@@ -1229,7 +1229,7 @@ void handle_client(int socket) {
 			if ((resp.contentlength!=0)&&(strlen(body)>0)){
 				response = addfield(response, body,&responsebuffersize);
 				TRACE
-				DBGMSG("body size = %d\n", strlen(body));
+				DBGMSG("body size = %d\n", (int) strlen(body));
 				//hexprint(response,strlen(response));
 			}
 			//if a cart exists show itemslist

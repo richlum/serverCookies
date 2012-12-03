@@ -14,7 +14,7 @@ mytime.o: mytime.c mytime.h
 
 
 clean:
-	-rm -rf cshttp.o service.o util.o cshttp test_util.o 
+	-rm -rf cshttp.o service.o util.o cshttp test_util.o mytime.o
 
 #############
 debug: CFLAGS += -DDEBUG 
