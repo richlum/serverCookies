@@ -32,3 +32,8 @@ cache-control
 		eg browser
 	no-cache if different each time
 
+bugs
+	delete an itemnumber not present reports deleting last item
+	but doesnt actually do anything... reporting error
+:q
+

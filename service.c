@@ -1019,6 +1019,7 @@ void handle_client(int socket) {
 					itemcount++;
 					itemlabelptr = getItemLabel(itemcount,itemlabel);
 				}else{
+					TRACE
 					break;
 				}
 
