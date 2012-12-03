@@ -4,3 +4,8 @@ Username: scotty
 Username: scotty
 0. phaser
 1. spacesuit
+Username: james Tiberius kirk
+0. porsche
+1. ferrari
+2. dilithium crystals
+3. phaser

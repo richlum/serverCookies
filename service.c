@@ -480,8 +480,6 @@ void handle_client(int socket) {
 			fprintf(stderr, "strlen msgbug = %d\n", (int)strlen(msgbuf)	);
 		}
 
-		char* endhdrs = strstr(msgbuf,"\r\n\r\n");
-		DBGMSG("strlen endhdrs = %d\n", (int)strlen(endhdrs));
 		TRACE
 		DBGMSG("complete message %d\n" , __LINE__);
 		//now have complete first part of message since we have blank line ie \r\n\r\n
