@@ -17,3 +17,8 @@ Username: james tiberius kirk
 2. banana
 3. phone
 Username: james tiberius kirk
+Username: james t kirk
+0. tribble
+1. phaser
+2. romulan ale
+3. ubc entry application

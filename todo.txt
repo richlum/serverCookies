@@ -4,6 +4,7 @@ When to encode
 	-file names being sent?
 When to decode
 	-attribute names and values being recvd
+		eg putfile with dot in name // form submit issue?
 	+files being received
 	-filenames being received
 getfile
