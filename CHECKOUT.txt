@@ -1,30 +1,5 @@
-Username: scotty
-0. phaser
-1. cpsc320 textbook
-Username: scotty
-0. phaser
-1. spacesuit
-Username: james Tiberius kirk
-0. porsche
-1. ferrari
-2. dilithium crystals
-3. phaser
-Username: mickeymouse
-0. lamborghini
-1. porsche
-Username: james Tiberius kirk
-0. dilithium crystals
-Username: mickeymouse
-0. dilithium crystals
-1. porsche
-Username: james t kirk
-0. mercedes
-1. jaguar
-2. bmw
-Username: James T Kirk
-0. phaser
-1. warp drive
-2. dilithium crystals
-3. flux capacitor
-4. ftl drive
-5. green eggs and ham
+Username: john q public
+0. banana
+1. orange
+2. lettuce
+3. cabbage

@@ -136,6 +136,8 @@ typedef struct resp_setting{
 	cachecontrol	cache;
 	int				contentlength;
 	int				dontmodifybody;
+	servcmd			cmd;
+	int 			totalmsgsize;
 } resp_setting;
 
 void hexprint(const char* buf, int len){
@@ -202,6 +204,20 @@ char* addheader(char* to, int respidx){
 	return to;
 
 }
+
+char* addbody(char* to, const char* body,
+		unsigned int *to_bufsize, unsigned int bodysize){
+	TRACE
+	while ((*to_bufsize)<=(bodysize+strlen(to))){
+		to=doubleBufferSize(to,to_bufsize);
+	}
+
+	memcpy(to+strlen(to), body, bodysize );
+	return to;
+
+
+}
+
 // add given field into http response
 // allocate more size if required.
 //
@@ -209,6 +225,7 @@ char* addfield(char* to, const char* from, unsigned int* to_bufsize){
 	while ((*to_bufsize-strlen(to))<=(strlen(from)+3)){
 		to=doubleBufferSize(to,to_bufsize);
 	}
+
 	strcat(to,from	);
 	strcat(to,lineend);
 	return to;
@@ -402,11 +419,13 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 }
 
 void check_if_method_error(http_method method,
-		char* msgbuf, int* respindex, const char* path) {
-	switch (method) {
+		char* msgbuf, int* respindex, const char* path, resp_setting resp ) {
 
+	resp.cmd=method;
+	switch (method) {
 	case METHOD_GET:
 		DBGMSG("path=%s\n", path );
+
 		TRACE
 		break;
 	case METHOD_POST:
@@ -424,6 +443,7 @@ void check_if_method_error(http_method method,
 		} else {
 			fprintf(stderr, "body = %s\n\n", abody);
 		}
+		resp.cache = NOCACHE;
 		break;
 	case METHOD_HEAD:
 	case METHOD_OPTIONS:
@@ -481,7 +501,7 @@ void handle_client(int socket) {
 	int inContentLen = 0;
 
 	do{
-		resp = (resp_setting){ 0,0,0,0,0};
+		resp = (resp_setting){ 0,0,0,0,0,0,0};
 
 		memset(msgbuf,'\0', *msgbufsize);
 		TRACE
@@ -588,7 +608,7 @@ void handle_client(int socket) {
 		fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
 		int respindex=-1;
 		path = http_parse_path(http_parse_uri(msgbuf));
-		check_if_method_error(method, msgbuf, &respindex, path);
+		check_if_method_error(method, msgbuf, &respindex, path, resp);
 
 		TRACE
 		/********** process cmd to  build response ******************************/
@@ -821,8 +841,8 @@ void handle_client(int socket) {
 				//					strcat(body, "filename=download.txt&content=");
 				char* bptr =body;// + strlen("filename=download.txt&content=");
 				FILE* fp;
-				fp = fopen(pfn,"r");
-				size_t bytes = fread(bptr, 1, resp.contentlength, fp);
+				fp = fopen(pfn,"rb");
+				size_t bytes = fread(bptr,1, resp.contentlength, fp);
 				//int bytes = read(file, body, resp.contentlength );
 				fprintf(stderr,"bytes read = %d\n",(int) bytes);
 
@@ -931,9 +951,10 @@ void handle_client(int socket) {
 			resp.contentlength=strlen(body);
 			resp.cache=PRIVATE;
 			respindex=2;
-
+			resp.dontmodifybody=1;
 			TRACE
 			break;
+
 			case CMDADDCART: ;
 			TRACE
 			char an_item[MAXITEMLEN];
@@ -968,12 +989,6 @@ void handle_client(int socket) {
 			}
 
 			TRACE
-//			for (i=0;i<itemcount;i++){
-//				DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
-//			}
-//			TRACE
-			// we now have recovered all addcart items from cookies
-			//itemcount is the next blank
 			assert(itemcount<=MAXITEMS);
 			TRACE
 			DBGMSG("CARTITEM = %s\n", cartitem);
@@ -994,12 +1009,6 @@ void handle_client(int socket) {
 				items[itemcount][ii] = '\0';
 
 				TRACE
-//				for (i=0;i<=itemcount;i++){
-//					DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
-//				}
-//				TRACE
-
-
 				char countstr[bufsize];
 				char* cstr=countstr;
 				TRACE
@@ -1041,9 +1050,8 @@ void handle_client(int socket) {
 			free(itembuffer);
 			itembuffer=NULL;
 			TRACE
-
-
 			break;
+
 			case CMDDELCART:  ;
 			TRACE
 			char del_item[MAXITEMLEN];
@@ -1105,7 +1113,6 @@ void handle_client(int socket) {
 			}
 
 			TRACE
-
 			for (i=0;i<=itemcount-1;i++){
 				DBGMSG("i=%d\n",i);
 				DBGMSG("ITEM='%s'\n",items[i]);
@@ -1142,10 +1149,6 @@ void handle_client(int socket) {
 			DBGMSG("itemcount = %d\n",itemcount);
 			DBGMSG("delete itemnumber = %d\n",itemnumber);
 
-//			for(i=0;i<=itemcount;i++){
-//				DBGMSG("\t%d %s\n",i,items[i*MAXITEMLEN]);
-//			}
-
 			memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
 			char cstr[bufsize];
 			//memset(tempstr,'\0',bufsize);
@@ -1159,7 +1162,6 @@ void handle_client(int socket) {
 				strcat(cartbody, ". ");
 				strcat(cartbody,p);
 				strcat(cartbody,lineend);
-				//DBGMSG("%d  %s\n",i,cartbody);
 			}
 
 			if (itemcount<=1)
@@ -1171,15 +1173,14 @@ void handle_client(int socket) {
 			itemcount--;
 			respindex=2;
 			resp.cache=PRIVATE;
-
 			break;
+
 			case CMDCHECKOUT:
 				TRACE
 				if ((usernamevalue)&&(strlen(usernamevalue)>0)){
 					if ((strlen(cmdresponsefields))!=0){
 						strcat (cmdresponsefields,lineend);
 					}
-
 
 					memset(items,'\0',MAXITEMS*MAXITEMLEN);
 					itemcount = 0;
@@ -1293,7 +1294,7 @@ void handle_client(int socket) {
 
 
 
-			if (resp.cache==NOCACHE)
+			if ((resp.cache==NOCACHE)||(resp.cmd==METHOD_POST))
 				response = addfield(response, nocache_http_cache_control,&responsebuffersize);
 			else if (resp.cache==PRIVATE)
 				response = addfield(response, private_http_cache_control,&responsebuffersize);
@@ -1321,17 +1322,22 @@ void handle_client(int socket) {
 			}
 
 			response = addfield(response, "" ,&responsebuffersize);
-
+			resp.totalmsgsize=strlen(response);
 			// attach the body now
 			// prepend username before response
 			if ((strlen(usernamebody)!=0)&&(resp.dontmodifybody!=1)){
 				response = addfield(response, usernamebody, &responsebuffersize);
 			}
 			// response body
-			if ((resp.contentlength!=0)&&(strlen(body)>0)){
-				response = addfield(response, body,&responsebuffersize);
+			if ((resp.contentlength!=0)){
+				//response = addfield(response, body,&responsebuffersize);
 				TRACE
-				DBGMSG("body size = %d\n", (int) strlen(body));
+				resp.totalmsgsize = strlen(response)+resp.contentlength;
+				DBGMSG("header size = %d\n", strlen(response));
+				DBGMSG("body size = %d\n", resp.contentlength);
+				DBGMSG("total size = %d\n", resp.totalmsgsize);
+				response = addbody(response, body, &responsebuffersize, resp.contentlength);
+
 				//hexprint(response,strlen(response));
 			}
 			//if a cart exists show itemslist
@@ -1346,12 +1352,13 @@ void handle_client(int socket) {
 			//above already
 		}
 
-		fprintf(stderr,"RESPONSE: $%s", response);
+		//fprintf(stderr,"RESPONSE: $%s", response);
 
 		/*********  send response *******************************/
 		TRACE
 		int sent=0;
-		int bytesout = send(socket,response,strlen(response),flag);
+		int bytesout = send(socket,response,resp.totalmsgsize,flag);
+		DBGMSG ("%d, bytesout = %d\n", __LINE__, bytesout);
 		if (bytesout==0){
 			fprintf(stderr, "remote closed connection, child closing\n");
 			persist_connection=0;
@@ -1359,9 +1366,11 @@ void handle_client(int socket) {
 		}else if (bytesout<0){
 			perror("send error:");
 		}else {// if (bytesout>0){
-			while(bytesout<(int)strlen(response)){
+			sent=bytesout;
+			while(sent<resp.totalmsgsize){
+				bytesout = send(socket,response+sent,(resp.totalmsgsize-sent),flag);
 				sent+=bytesout;
-				bytesout = send(socket,response+sent,strlen(response+sent),flag);
+				DBGMSG("%d, sent bytes = %d\n", __LINE__, sent)
 				if (bytesout==0){
 					fprintf(stderr, "remote closed connection, child closing\n");
 					persist_connection=0;
@@ -1384,6 +1393,7 @@ void handle_client(int socket) {
 			break;
 		}
 		TRACE
+
 	} while( bytesin >0);
 	fprintf(stderr,"child exiting\n");
 
