@@ -1,4 +1,0 @@
-CPSC310 .101 	Dec 05, 12:00 pm 	CIRS 1250	 	 
-CPSC317 .101 	Dec 19, 3:30 pm 	DMP 310	 	 
-CPSC320 .101 	Dec 18, 12:00 pm 	CIRS 1250	 	 
-CPSC415 .101 	Dec 17, 12:00 pm 	DMP 301	 	 
