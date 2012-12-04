@@ -4,36 +4,34 @@ When to encode
 	-file names being sent?
 When to decode
 	-attribute names and values being recvd
-	-files being received
+	+files being received
 	-filenames being received
 getfile
 	+file doesnt exist
 	+unaccessible file  404 nont found
 	-conditional getsa  - TEST
 	+include last modified headder
-	ifmodifiedsince - not modified response	TEST
+	ifmodifiedsince - not modified response	TEST  ??
 putfile
-	-overwrite if exists, not append:w
-	-no permission , 403 forbidden
-	"filename" has been saved succesfully
+	+overwrite if exists, not append:w
+	-no permission , 403 forbidden  ??
+	+"filename" has been saved succesfully
 checkout
-	-"User muist be logged in to checkout"
+	+"User muist be logged in to checkout"
 close
-	-"The connection will now be closed"
+	+"The connection will now be closed"
 
-	Command not Found + http response code 
-	Forbidden for commands missing args
+	+Command not Found + http response code 
+	+Forbidden for commands missing args
 favicon
-	not found
+	+not found
 cache-control
-	public is its static - same uri, same parms = same result
+	+public is its static - same uri, same parms = same result
 		eg getfile
-	private only if results same for same instance
+	+private only if results same for same instance
 		eg browser
-	no-cache if different each time
+	+no-cache if different each time
 
 bugs
-	delete an itemnumber not present reports deleting last item
+	+fixed.delete an itemnumber not present reports deleting last item
 	but doesnt actually do anything... reporting error
-:q
-
