@@ -388,7 +388,7 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 	for (i=0; i<=itemcount;i++){
 		char* p;
 
-		p= &items[i*MAXITEMLEN];
+		p= &items[i];
 		DBGMSG("item=%s\n",p);
 		sprintf(cstr,"%d",i);
 		strcat(cartbody,cstr);
@@ -955,7 +955,14 @@ void handle_client(int socket) {
 					!=NULL){
 				TRACE
 				DBGMSG("\t%d, %s\n",itemcount, itemptr);
-				strcpy(items[itemcount*MAXITEMLEN],itemptr);
+				char* p = itemptr;
+				unsigned int ii;
+				for (ii=0;ii<strlen(itemptr);ii++){
+					items[itemcount][ii]  = *p;
+					p++;
+				}
+					
+				//strcpy(items[itemcount*MAXITEMLEN],itemptr);
 				itemcount++;
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
 			}
@@ -976,7 +983,15 @@ void handle_client(int socket) {
 
 
 				assert (strlen (cartitem)< MAXITEMLEN);
-				strcpy(items[itemcount*MAXITEMLEN],cartitem);
+				TRACE
+				char* p = cartitem;
+				//strncpy(p,cartitem,MAXITEMLEN);
+				unsigned int ii;
+				for (ii=0;ii<strlen(cartitem);ii++){
+					items[itemcount][ii]  = *p;
+					p++;
+				}
+				items[itemcount][ii] = '\0';
 
 				TRACE
 //				for (i=0;i<=itemcount;i++){
@@ -991,7 +1006,7 @@ void handle_client(int socket) {
 				for (i=0; i<=itemcount;i++){
 					char* p;
 
-					p= items[i*MAXITEMLEN];
+					p= items[i];
 					DBGMSG("item=%s\n",p);
 					sprintf(cstr,"%d",i);
 					strcat(cartbody,cstr);
@@ -1062,7 +1077,7 @@ void handle_client(int socket) {
 				TRACE
 				if (itemptr!=NULL){
 					DBGMSG("%d  itemptr=%s\n",itemcount,itemptr);
-					strcpy(items[itemcount*MAXITEMLEN],itemptr);
+					strcpy(items[itemcount],itemptr);
 					TRACE
 					itemcount++;
 					itemlabelptr = getItemLabel(itemcount,itemlabel);
@@ -1086,14 +1101,14 @@ void handle_client(int socket) {
 
 			TRACE
 			for(i=0;i<=itemcount;i++){
-				DBGMSG("\t%d %s\n",i,items[i*MAXITEMLEN]);
+				DBGMSG("\t%d %s\n",i,items[i]);
 			}
 
 			TRACE
 
 			for (i=0;i<=itemcount-1;i++){
 				DBGMSG("i=%d\n",i);
-				DBGMSG("ITEM='%s'\n",items[i*MAXITEMLEN]);
+				DBGMSG("ITEM='%s'\n",items[i]);
 				if (i<itemnumber){
 					//do nothing
 					TRACE
@@ -1105,7 +1120,7 @@ void handle_client(int socket) {
 					strcat(cmdresponsefields," ");
 					strcat(cmdresponsefields,itemlabelptr);
 					strcat(cmdresponsefields, "=");
-					strcat(cmdresponsefields, items[i*MAXITEMLEN]);
+					strcat(cmdresponsefields, items[i]);
 					strcat(cmdresponsefields, expirenow_http_cookie_opt);
 					//items[itemcount]=NULL;
 					DBGMSG("final del (%d) cmdresponsefields='%s'\n",i,cmdresponsefields);
@@ -1117,10 +1132,10 @@ void handle_client(int socket) {
 					//strcat(cmdresponsefields," ");
 					strcat(cmdresponsefields,itemlabelptr);
 					strcat(cmdresponsefields, "=");
-					strcat(cmdresponsefields, items[(i+1)*MAXITEMLEN]);
+					strcat(cmdresponsefields, items[(i+1)]);
 					strcat(cmdresponsefields, default_http_cookie_opt);
 					strcat(cmdresponsefields, lineend);
-					strncpy(items[i*MAXITEMLEN],items[(i+1)*MAXITEMLEN],MAXITEMLEN);
+					strncpy(items[i],items[(i+1)],MAXITEMLEN);
 				}
 			}
 			TRACE
@@ -1137,7 +1152,7 @@ void handle_client(int socket) {
 			for (i=0; i<(itemcount-1);i++){
 				char* p;
 
-				p= items[i*MAXITEMLEN];
+				p= items[i];
 				DBGMSG("item=%s\n",p);
 				sprintf(cstr,"%d",i);
 				strcat(cartbody,cstr);
@@ -1178,7 +1193,7 @@ void handle_client(int socket) {
 						TRACE
 						if (itemptr!=NULL){
 							DBGMSG("%d  itemptr=%s\n",itemcount,itemptr);
-							strcpy(items[itemcount*MAXITEMLEN],itemptr);
+							strcpy(items[itemcount],itemptr);
 							TRACE
 							itemcount++;
 							itemlabelptr = getItemLabel(itemcount,itemlabel);
@@ -1199,7 +1214,7 @@ void handle_client(int socket) {
 					char tempstr[maxcookiesize];
 					for(i=0;i<itemcount;i++){
 						sprintf(tempstr,"%d. ",i);
-						strcat(tempstr, items[i*MAXITEMLEN] );
+						strcat(tempstr, items[i] );
 						strcat(tempstr, lineend);
 						fprintf(fp, "%s", tempstr);
 
@@ -1214,7 +1229,7 @@ void handle_client(int socket) {
 						strcat(cmdresponsefields, default_http_cookie_header);
 						strcat(cmdresponsefields,itemlabelptr);
 						strcat(cmdresponsefields, "=");
-						strcat(cmdresponsefields, items[i*MAXITEMLEN]);
+						strcat(cmdresponsefields, items[i]);
 						strcat(cmdresponsefields, expirenow_http_cookie_opt);
 						if (i<itemcount-1)
 							strcat(cmdresponsefields, lineend);
