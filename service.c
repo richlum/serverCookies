@@ -139,6 +139,7 @@ typedef struct resp_setting{
 	int				contentlength;
 	int				dontmodifybody;
 	servcmd			cmd;
+	http_method		method;
 	int 			totalmsgsize;
 } resp_setting;
 
@@ -421,9 +422,9 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 }
 
 void check_if_method_error(http_method method,
-		char* msgbuf, int* respindex, const char* path, resp_setting resp ) {
+		char* msgbuf, int* respindex, const char* path ,resp_setting* resp ) {
 
-	resp.cmd=method;
+	
 	switch (method) {
 	case METHOD_GET:
 		DBGMSG("path=%s\n", path );
@@ -445,7 +446,7 @@ void check_if_method_error(http_method method,
 		} else {
 			fprintf(stderr, "body = %s\n\n", abody);
 		}
-		resp.cache = NOCACHE;
+		resp->cache= NOCACHE;
 		break;
 	case METHOD_HEAD:
 	case METHOD_OPTIONS:
@@ -503,7 +504,7 @@ void handle_client(int socket) {
 	int inContentLen = 0;
 
 	do{
-		resp = (resp_setting){ 0,0,0,0,0,0,0};
+		resp = (resp_setting){ 0,0,0,0,0,0,0,0};
 
 		memset(msgbuf,'\0', *msgbufsize);
 		TRACE
@@ -607,10 +608,11 @@ void handle_client(int socket) {
 
 		//method
 		method = http_parse_method(msgbuf);
+		resp.method= method;
 		fprintf(stderr,  "method=%d, %s\n ", method, http_method_str[method]);
 		int respindex=-1;
 		path = http_parse_path(http_parse_uri(msgbuf));
-		check_if_method_error(method, msgbuf, &respindex, path, resp);
+		check_if_method_error(method, msgbuf, &respindex, path, &resp);
 
 		TRACE
 		/********** process cmd to  build response ******************************/
@@ -1299,7 +1301,7 @@ void handle_client(int socket) {
 
 
 
-			if ((resp.cache==NOCACHE)||(resp.cmd==METHOD_POST))
+			if ((resp.cache==NOCACHE)||(resp.method==METHOD_POST))
 				response = addfield(response, nocache_http_cache_control,&responsebuffersize);
 			else if (resp.cache==PRIVATE)
 				response = addfield(response, private_http_cache_control,&responsebuffersize);
@@ -1344,7 +1346,7 @@ void handle_client(int socket) {
 				//response = addfield(response, body,&responsebuffersize);
 				TRACE
 				resp.totalmsgsize = strlen(response)+resp.contentlength;
-				DBGMSG("header size = %d\n", strlen(response));
+				DBGMSG("header size = %d\n", (int)strlen(response));
 				DBGMSG("body size = %d\n", resp.contentlength);
 				DBGMSG("total size = %d\n", resp.totalmsgsize);
 				response = addbody(response, body, &responsebuffersize, resp.contentlength);
