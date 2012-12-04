@@ -972,7 +972,7 @@ void handle_client(int socket) {
 			DBGMSG("CARTITEM = %s\n", cartitem);
 			if (cartitem){
 				TRACE
-				DBGMSG("itemcount = %d, strlen(cartitem) = %d\n",itemcount,strlen(cartitem));
+				DBGMSG("itemcount = %d, strlen(cartitem) = %d\n",itemcount,(int)strlen(cartitem));
 
 
 				assert (strlen (cartitem)< MAXITEMLEN);
