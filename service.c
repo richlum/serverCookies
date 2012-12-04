@@ -969,7 +969,7 @@ void handle_client(int socket) {
 			//itemcount is the next blank
 			assert(itemcount<=MAXITEMS);
 			TRACE
-			DBGMSG("CARTITEM = %d\n", cartitem);
+			DBGMSG("CARTITEM = %s\n", cartitem);
 			if (cartitem){
 				TRACE
 				assert (strlen (cartitem)< MAXITEMLEN);
