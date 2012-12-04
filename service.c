@@ -31,7 +31,7 @@
 
 #include <time.h>
 
-#define bufsize 256
+#define bufsize 4096
 #define maxcookiesize 4096
 #define MAXITEMS 12
 #define MAXITEMLEN 64
@@ -386,7 +386,9 @@ char* buildCartBody(char* items, int itemcount, char* cartbody){
 	char* cstr=countstr;
 	TRACE
 	for (i=0; i<=itemcount;i++){
-		char* p = &items[i*MAXITEMLEN];
+		char* p;
+
+		p= &items[i*MAXITEMLEN];
 		DBGMSG("item=%s\n",p);
 		sprintf(cstr,"%d",i);
 		strcat(cartbody,cstr);
@@ -936,7 +938,7 @@ void handle_client(int socket) {
 			TRACE
 			char an_item[MAXITEMLEN];
 			char* cartitem = getargvalue("item", path, an_item);
-			// get the items from cookies
+			// get a item from user argument
 			//shopping cart structure for handling addcart items
 
 			memset(items,'\0',MAXITEMS*MAXITEMLEN);
@@ -948,17 +950,46 @@ void handle_client(int socket) {
 
 			while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
 					!=NULL){
-				strcpy(items[itemcount],itemptr);
+				strcpy(items[itemcount*MAXITEMLEN],itemptr);
 				itemcount++;
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
 			}
+//			TRACE
+//			for (i=0;i<itemcount;i++){
+//				DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
+//			}
+//			TRACE
 			// we now have recovered all addcart items from cookies
 			//itemcount is the next blank
 			assert(itemcount<=MAXITEMS);
 
 			if (cartitem){
 				assert (strlen (cartitem)< MAXITEMLEN);
-				strcpy(items[itemcount],cartitem);
+				strcpy(items[itemcount*MAXITEMLEN],cartitem);
+
+//				TRACE
+//				for (i=0;i<=itemcount;i++){
+//					DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
+//				}
+//				TRACE
+
+
+				char countstr[bufsize];
+				char* cstr=countstr;
+				TRACE
+				for (i=0; i<=itemcount;i++){
+					char* p;
+
+					p= items[i*MAXITEMLEN];
+					DBGMSG("item=%s\n",p);
+					sprintf(cstr,"%d",i);
+					strcat(cartbody,cstr);
+					strcat(cartbody, ". ");
+					strcat(cartbody,p);
+					strcat(cartbody,lineend);
+					//DBGMSG("%d  %s\n",i,cartbody);
+				}
+
 
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
 				strcat(cmdresponsefields, default_http_cookie_header);
@@ -968,7 +999,7 @@ void handle_client(int socket) {
 				strcat(cmdresponsefields, cartitem);
 				strcat(cmdresponsefields, default_http_cookie_opt);
 
-				cartbody = buildCartBody((char*)items,itemcount, cartbody);
+				//cartbody = buildCartBody((char*)&items,itemcount, cartbody);
 				resp.contentlength+=strlen(cartbody);
 				itemcount++;
 				respindex=2;
@@ -1027,6 +1058,22 @@ void handle_client(int socket) {
 			TRACE
 			// we now have recovered all addcart items from cookies
 			//int i;
+			if (itemnumber>(itemcount-1)){  //zero based count and
+				TRACE
+				DBGMSG("trying to remove %d, of max %d item\n",itemnumber, itemcount);
+				respindex=19;
+				strcpy(usernamebody,"No valid itemnr found");
+				break;
+			}
+
+
+			TRACE
+			for(i=0;i<=itemcount;i++){
+				DBGMSG("\t%d %s\n",i,items[i*MAXITEMLEN]);
+			}
+
+			TRACE
+
 			for (i=0;i<=itemcount-1;i++){
 				DBGMSG("i=%d\n",i);
 				DBGMSG("ITEM='%s'\n",items[i*MAXITEMLEN]);
@@ -1060,16 +1107,29 @@ void handle_client(int socket) {
 				}
 			}
 			TRACE
+			DBGMSG("itemcount = %d\n",itemcount);
+			DBGMSG("delete itemnumber = %d\n",itemnumber);
+
+//			for(i=0;i<=itemcount;i++){
+//				DBGMSG("\t%d %s\n",i,items[i*MAXITEMLEN]);
+//			}
+
 			memset (cartbody,'\0',MAXITEMS*MAXITEMLEN);
-			char tempstr[bufsize];
-			memset(tempstr,'\0',bufsize);
-			for (i=0;i<itemcount-1;i++){
-				fprintf(stderr, "%s\n",items[i*MAXITEMLEN]);
-				sprintf(tempstr,"%d. ",i);
-				strcat(cartbody, tempstr);
-				strcat(cartbody, items[i*MAXITEMLEN]);
-				strcat(cartbody, lineend);
+			char cstr[bufsize];
+			//memset(tempstr,'\0',bufsize);
+			for (i=0; i<(itemcount-1);i++){
+				char* p;
+
+				p= items[i*MAXITEMLEN];
+				DBGMSG("item=%s\n",p);
+				sprintf(cstr,"%d",i);
+				strcat(cartbody,cstr);
+				strcat(cartbody, ". ");
+				strcat(cartbody,p);
+				strcat(cartbody,lineend);
+				//DBGMSG("%d  %s\n",i,cartbody);
 			}
+
 			if (itemcount<=1)
 				strcpy(cartbody," EMPTY CART");
 			TRACE
