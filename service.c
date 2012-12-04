@@ -943,17 +943,24 @@ void handle_client(int socket) {
 
 			memset(items,'\0',MAXITEMS*MAXITEMLEN);
 			itemcount = 0;
-			memset(itemstring,'\0',bufsize);
+
+			char* itembuffer=(char*)malloc(maxcookiesize*MAXITEMS);
+			memset(itembuffer,'\0',maxcookiesize*MAXITEMS);
+
 			itemlabelptr = getItemLabel(itemcount,itemlabel);
 			itemptr = cookieptr;
 			TRACE
 
-			while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itemstring))
+			while((itemptr = getdecodedCookieAttribute(cookieptr, itemlabelptr, itembuffer))
 					!=NULL){
+				TRACE
+				DBGMSG("\t%d, %s\n",itemcount, itemptr);
 				strcpy(items[itemcount*MAXITEMLEN],itemptr);
 				itemcount++;
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
 			}
+			free(itembuffer);
+			itembuffer=NULL;
 //			TRACE
 //			for (i=0;i<itemcount;i++){
 //				DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
