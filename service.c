@@ -1258,6 +1258,7 @@ void handle_client(int socket) {
 				strcpy(body, "The connection will now be closed");
 				//contlength=strlen(body);
 				resp.contentlength+=strlen(body);
+				resp.content = PLAIN;
 				DBGMSG("content length = %d\n",resp.contentlength);
 				break;
 			case -1:
@@ -1329,6 +1330,12 @@ void handle_client(int socket) {
 				response = addfield(response, usernamebody, &responsebuffersize);
 			}
 			// response body
+			//if a cart exists show itemslist
+			if ((strlen(cartbody)!=0)&&(resp.dontmodifybody!=1)){
+				response = addfield(response, cartbody,&responsebuffersize);
+			}
+
+			resp.totalmsgsize=strlen(response);
 			if ((resp.contentlength!=0)){
 				//response = addfield(response, body,&responsebuffersize);
 				TRACE
@@ -1340,10 +1347,6 @@ void handle_client(int socket) {
 
 				//hexprint(response,strlen(response));
 			}
-			//if a cart exists show itemslist
-			if ((strlen(cartbody)!=0)&&(resp.dontmodifybody!=1)){
-				response = addfield(response, cartbody,&responsebuffersize);
-			}
 
 		}else{
 			//todo we always need some kind of response?
@@ -1352,7 +1355,7 @@ void handle_client(int socket) {
 			//above already
 		}
 
-		//fprintf(stderr,"RESPONSE: $%s", response);
+		fprintf(stderr,"RESPONSE: $%s", response);
 
 		/*********  send response *******************************/
 		TRACE
@@ -1380,7 +1383,7 @@ void handle_client(int socket) {
 					perror("recv error:");
 			}
 		}
-
+		TRACE
 		if (!persist_connection){
 			TRACE
 			release_connection_resources(msgbuf);
