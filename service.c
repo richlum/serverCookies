@@ -968,12 +968,14 @@ void handle_client(int socket) {
 			// we now have recovered all addcart items from cookies
 			//itemcount is the next blank
 			assert(itemcount<=MAXITEMS);
-
+			TRACE
+			DBGMSG("CARTITEM = %d\n", cartitem);
 			if (cartitem){
+				TRACE
 				assert (strlen (cartitem)< MAXITEMLEN);
 				strcpy(items[itemcount*MAXITEMLEN],cartitem);
 
-//				TRACE
+				TRACE
 //				for (i=0;i<=itemcount;i++){
 //					DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
 //				}
@@ -996,7 +998,7 @@ void handle_client(int socket) {
 					//DBGMSG("%d  %s\n",i,cartbody);
 				}
 
-
+				TRACE
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
 				strcat(cmdresponsefields, default_http_cookie_header);
 				strcat(cmdresponsefields," ");
@@ -1010,6 +1012,7 @@ void handle_client(int socket) {
 				itemcount++;
 				respindex=2;
 				resp.cache=PRIVATE;
+				TRACE
 			}else{
 				respindex=19;
 				strcpy(usernamebody,"No user name found");
