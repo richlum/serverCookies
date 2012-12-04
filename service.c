@@ -115,6 +115,8 @@ const char* default_http_cookie_header = "Set-Cookie: ";
 const char* default_http_charset = "Accept-Charset: IOS-8859-1,utf-8;q=0.7,*;q=0.3;";
 const char* default_http_lang = "Accept-Languate: en-US,en;q=0.8";
 const char* default_http_encoding = "Accept-Encoding:gzip,deflate,sdch";
+const char* specify_http_contentdisposition_header ="Content-Disposition: attachment; filename=";   
+
 const char* timeformatstr ="%a, %d %b %Y %T %Z";
 
 typedef enum  {
@@ -863,7 +865,9 @@ void handle_client(int socket) {
 			strcat(cmdresponsefields, lineend);
 			strcat(cmdresponsefields, "Last-Modified: ");
 			strcat(cmdresponsefields, filetime);
-			//strcat(cmdresponsefields, lineend);
+			strcat(cmdresponsefields, lineend);
+			strcat(cmdresponsefields, specify_http_contentdisposition_header);
+			strcat(cmdresponsefields, pfn);
 
 			resp.content=APPL_OCTET;
 			respindex=2;
