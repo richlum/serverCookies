@@ -959,9 +959,8 @@ void handle_client(int socket) {
 				itemcount++;
 				itemlabelptr = getItemLabel(itemcount,itemlabel);
 			}
-			free(itembuffer);
-			itembuffer=NULL;
-//			TRACE
+
+			TRACE
 //			for (i=0;i<itemcount;i++){
 //				DBGMSG("\t%d %s\n ", i, items[i*MAXITEMLEN]);
 //			}
@@ -1017,6 +1016,11 @@ void handle_client(int socket) {
 			}
 			TRACE
 			DBGMSG("cmdresponsefields='%s'\n",cmdresponsefields );
+			TRACE
+			free(itembuffer);
+			itembuffer=NULL;
+			TRACE
+
 
 			break;
 			case CMDDELCART:  ;
